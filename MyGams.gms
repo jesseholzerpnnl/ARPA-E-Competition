@@ -1,16 +1,27 @@
 $title pscopf_run
 $ontext
 runs everything
+
+usage:
+
+  gams MyGams.gms --case="case_file_name.gms"
+
+e.g.
+
+  gams MyGams.gms --case=pscopf_data.gms
+
+or
+
+  gams MyGams.gms --case=pscopf_data_hacked_case14.gms
+
 $offtext
 
-$if not set ingms $set ingms pscopf_data.gms
-*$if not set ingms $set ingms pscopf_data_hacked_case14.gms
+$if not set case $abort 'usage: gams MyGams.gms --case="case_file_name.gms"'
+$if not exist '%case%' $abort 'specified data file "%case%" does not exist'
+$if not exist pscopf_run.gms $abort 'missing file "pscopf_run.gms"'
+$if not exist pscopf_prepare_data.gms $abort 'missing file "pscopf_prepare_data.gms"'
+$if not exist pscopf.gms $abort 'missing file "pscopf.gms"'
+$if not exist pscopf_output_format0.gms $abort 'missing file "pscopf_output_format0.gms"'
+$if not exist pscopf_output_format1.gms $abort 'missing file "pscopf_output_format1.gms"'
 
-$if not set nlp $set nlp knitro
-
-* copy the original data file into this folder
-$call 'cp "%ingms%" pscopf_data_temp.gms'
-
-$call 'gams pscopf_prepare_data.gms --ingms=pscopf_data_temp.gms gdx=pscopf_data.gdx'
-
-$call 'gams pscopf.gms --ingdx=pscopf_data.gdx nlp=%nlp%'
+$call 'gams pscopf_run.gms --ingms=%case% --nlp=knitro'
