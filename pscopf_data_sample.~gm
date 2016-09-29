@@ -1,0 +1,153 @@
+* pscopf_data_sample_formal
+
+* scalar parameters
+parameters
+  mvaBase /
+100
+/;
+
+* set elements can be strings, e.g. j1,j2,
+* or integers, e.g. 1,2,3...
+sets
+  circuits /
+c1
+/
+  branches /
+i1
+/
+  buses /
+j1
+j2
+/
+  contingencies /
+k1
+/
+  generators /
+l1
+/
+  polynomialCostTerms /
+m0
+m1
+m2
+/
+  units /
+u1
+/
+;
+
+alias(circuits,c,c0,c1,c2,c3);
+alias(branches,i,i0,i1,i2,i3);
+alias(buses,j,j0,j1,j2,j3);
+alias(cases,k,k0,k1,k2,k3);
+alias(generators,l,l0,l1,l2,l3)
+alias(polynomialCostTerms,m,m0,m1,m2,m3);
+alias(units,u,u0,u1,u2,u3);
+
+* network topology
+set
+  ijOrigin(i,j) /
+i1.j1
+/
+  ijDestination(i,j) /
+i1.j2
+/
+  icMap(i,c) /
+i1.c1
+/
+  ljMap(l,j) /
+l1.j1
+/
+  luMap(l,u) /
+l1.u1
+/
+  ikInactive(i,k) /
+i1.k1
+/
+  lkInactive(l,k) /
+l1.k1
+/
+;
+
+* bus characteristics
+parameters
+  jShuntConductance(j) /
+j1 0
+j2 0
+/
+  jShuntSusceptance(j) /
+j1 0
+j2 0
+/
+  jVoltageMagnitudeMin(j) /
+j1 0.9
+j2 0.9
+/
+  jVoltageMagnitudeMax(j) /
+j1 1.1
+j2 1.1
+/
+  jRealPowerDemand(j) /
+j1 1
+j2 0.1
+/
+  jReactivePowerDemand(j) /
+j1 0
+j2 0
+/
+;
+
+* branch characteristics
+parameters
+  iSeriesResistance(i) /
+i1 0.1
+/
+  iSeriesReactance(i) /
+i1 -0.1
+/
+  iChargingSusceptance(i) /
+i1 0.1
+/
+  iTapRatio(i) /
+i1 1
+/
+  iPhaseShift(i) /
+i1 0
+/
+  iPowerMagnitudeMax(i) /
+i1 2
+/
+;
+
+* generator characteristics
+parameters
+  lRealPowerMin(l) /
+l1 0
+/
+  lRealPowerMax(l) /
+l1 2
+/
+  lReactivePowerMin(l) /
+l1 -3
+/
+  lReactivePowerMax(l) /
+l1 3
+/
+  lParticipationFactor(l) /
+l1 1
+/
+;
+
+* generator cost characteristics
+parameters
+  lmRealPowerCostCoefficient(l,m) /
+l1.m0 0
+l1.m1 1
+l1.m2 0
+/
+  lmRealPowerCostExponent(l,m) /
+l1.m0 0
+l1.m1 1
+l1.m2 2
+/
+;
+

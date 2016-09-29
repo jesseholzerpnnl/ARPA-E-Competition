@@ -1,0 +1,16 @@
+
+--- Job pscopf_run.gms Start 09/22/16 15:30:24 24.7.3 r58181 WEX-WEI x86 64bit/MS Windows
+GAMS 24.7.3   Copyright (C) 1987-2016 GAMS Development. All rights reserved
+Licensee: Small MUD - 5 User License                     G160411:0805CO-WIN
+          Pacific Northwest National Laboratory                     DC12422
+          License Admin: Nader Samaan, nader.samaan@pnnl.gov               
+--- Starting compilation
+--- pscopf_run.gms(12) 2 Mb
+--- call cp "pscopf_data_hacked_case14.gms" pscopf_data_temp.gms
+--- pscopf_run.gms(14) 2 Mb
+--- call gams pscopf_prepare_data.gms --ingms=pscopf_data_temp.gms gdx=pscopf_data.gdx
+--- pscopf_run.gms(16) 2 Mb
+--- call gams pscopf.gms --ingdx=pscopf_data.gdx nlp=knitro
+--- Starting execution - empty program
+*** Status: Normal completion
+--- Job pscopf_run.gms Stop 09/22/16 15:30:25 elapsed 0:00:01.134

@@ -1,0 +1,9 @@
+To run the GAMS model do
+
+    'gams pscopf_run.gms --ingms=pscopf_data.gms --nlp=knitro'
+
+The output in the required format will be written to 'out1.txt'.
+Output in a different format will go to 'out0.txt'.
+A different data file, such as 'pscopf_data_hacked_case14.gms',
+can be substituted for 'pscopf_data.gms'.
+And a different solver, such as 'ipopt', can be substituted for 'knitro'.

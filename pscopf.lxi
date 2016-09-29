@@ -1,0 +1,71 @@
+B 2 C o m p i l a t i o n
+B 666 Include File Summary
+B 687 Equation Listing    SOLVE pscopf_pen Using NLP From line 484
+D 688 objDef
+D 694 penaltyDef
+D 699 costDef
+D 714 jkRealPowerBalance
+D 745 jkReactivePowerBalance
+D 778 ikPowerMagnitudeOriginBound
+D 804 ikPowerMagnitudeDestinationBound
+D 830 jkShuntRealPowerDef
+D 847 jkShuntReactivePowerDef
+D 864 ijjkRealPowerOriginDef
+D 911 ijjkReactivePowerOriginDef
+D 958 ijjkRealPowerDestinationDef
+D 1005 ijjkReactivePowerDestinationDef
+D 1052 ijjkVoltageMagnitudeSeriesImpedanceZeroEq
+D 1057 ijjkVoltageAngleSeriesImpedanceZeroEq
+D 1062 ikRealPowerSeriesImpedanceZeroEq
+D 1067 ijjkReactivePowerSeriesImpedanceZeroEq
+D 1072 lkRealPowerRecoveryDef
+D 1077 jkVoltageMagnitudeMaintenanceViolationDef
+B 1084 Column Listing      SOLVE pscopf_pen Using NLP From line 484
+E 1085 lkRealPower
+E 1105 lkReactivePower
+E 1121 jkVoltageMagnitude
+E 1166 jkVoltageAngle
+E 1211 jkShuntRealPower
+E 1230 jkShuntReactivePower
+E 1249 ikRealPowerOrigin
+E 1271 ikReactivePowerOrigin
+E 1293 ikRealPowerDestination
+E 1315 ikReactivePowerDestination
+E 1337 obj
+E 1344 penalty
+E 1352 cost
+B 1362 Model Statistics    SOLVE pscopf_pen Using NLP From line 484
+B 1380 Solution Report     SOLVE pscopf_pen Using NLP From line 484
+F 1473 objDef
+F 1474 penaltyDef
+F 1475 costDef
+F 1481 jkRealPowerBalance
+F 1500 jkReactivePowerBalance
+F 1519 ikPowerMagnitudeOriginBound
+F 1544 ikPowerMagnitudeDestinationBound
+F 1569 jkShuntRealPowerDef
+F 1588 jkShuntReactivePowerDef
+F 1607 ijjkRealPowerOriginDef
+F 1632 ijjkReactivePowerOriginDef
+F 1657 ijjkRealPowerDestinationDef
+F 1682 ijjkReactivePowerDestinationDef
+F 1707 ijjkVoltageMagnitudeSeriesImpedanceZeroEq
+F 1712 ijjkVoltageAngleSeriesImpedanceZeroEq
+F 1717 ikRealPowerSeriesImpedanceZeroEq
+F 1722 ijjkReactivePowerSeriesImpedanceZeroEq
+F 1727 lkRealPowerRecoveryDef
+F 1732 jkVoltageMagnitudeMaintenanceViolationDef
+G 1732 lkRealPower
+G 1742 lkReactivePower
+G 1752 jkVoltageMagnitude
+G 1771 jkVoltageAngle
+G 1790 jkShuntRealPower
+G 1809 jkShuntReactivePower
+G 1828 ikRealPowerOrigin
+G 1853 ikReactivePowerOrigin
+G 1878 ikRealPowerDestination
+G 1903 ikReactivePowerDestination
+G 1928 obj
+G 1932 penalty
+G 1933 cost
+B 1942 E x e c u t i o n

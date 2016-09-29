@@ -1,0 +1,1640 @@
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 1
+pscopf
+C o m p i l a t i o n
+
+
+      Preventive security-constrained optimal power flow
+       
+      ACOPF model
+      with (presumably convex) quadratic real power generation cost functions
+       
+       
+      polynomial and convex piecewise linear real power generation cost functions
+      preventive security constraints based on prescribed reaction to contingencies
+       
+      are other MVA and KV bases needed?
+       
+      On processing into per unit, the solution with no security contingencies
+      agrees exactly with the Matpower solution for case14.
+      However, reading the psse version of case14 into matpower and translating it to
+      a matpower case and using that to generate data for this model give a
+      slightly different even if the cost data is taken from the original matpower case14.
+      If the cost data is taken from our generator.csv file, the solution is radically
+      different.
+      The agreement with matpower on the original case14 suggests that at least the
+      ACOPF model contained here, and all the per unit transformations, are correct.
+       
+      We need to map the matpower components and GAMS components to
+      the original component identifiers (buses, branches, etc.)
+       
+      need to know:
+      which buses are original, what are their identifiers?
+      what are the generator identifiers?
+  31   
+  32  * data gms file
+  34   
+  35  * voltage magnitude deviation penalty
+  37   
+  38  * model:
+  39  * pen
+  40  * strict
+  42   
+  44   
+  45  set baseCase /baseCase/;
+  46  set nonnegativeIntegers /0*1000000/;
+  47   
+  48  sets
+  49    circuits c
+  50    branches i
+  51    buses j
+  52    cases k
+  53    generators l
+  54    polynomialCostTerms m
+  55    units u;
+  56   
+  57  alias(circuits,c,c0,c1,c2,c3);
+  58  alias(branches,i,i0,i1,i2,i3);
+  59  alias(buses,j,j0,j1,j2,j3);
+  60  alias(cases,k,k0,k1,k2,k3);
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 2
+pscopf
+C o m p i l a t i o n
+
+
+  61  alias(generators,l,l0,l1,l2,l3)
+  62  alias(polynomialCostTerms,m,m0,m1,m2,m3);
+  63  alias(units,u,u0,u1,u2,u3);
+  64   
+  65  * network topology
+  66  set
+  67    ijOrigin(i,j)
+  68    ijDestination(i,j)
+  69    ijjOriginDestination(i,j1,j2)
+  70    icMap(i,c)
+  71    ljMap(l,j)
+  72    luMap(l,u)
+  73    ikInactive(i,k)
+  74    lkInactive(l,k)
+  75    ikActive(i,k)
+  76    lkActive(l,k)
+  77    kBase(k);
+  78   
+  79  * branches with zero series impedance are treated specially
+  80  set
+  81    iSeriesImpedanceZero(i)
+  82    iSeriesImpedanceNonzero(i);
+  83   
+  84  * system technical characteristics
+  85  parameter
+  86    baseMVA;
+  87   
+  88  * bus technical characteristics
+  89  parameters
+  90    jBaseKV(j)
+  91    jShuntConductance(j) g^sh
+  92    jShuntSusceptance(j) b^sh;
+  93   
+  94  * bus performance limits
+  95  parameters
+  96    jVoltageMagnitudeMin(j) v^min
+  97    jVoltageMagnitudeMax(j) v^max;
+  98   
+  99  * bus power demand
+ 100  parameters
+ 101    jRealPowerDemand(j) p^dem
+ 102    jReactivePowerDemand(j) q^dem;
+ 103   
+ 104  * branch technical characteristics
+ 105  parameters
+ 106    iSeriesResistance(i) r^s
+ 107    iSeriesReactance(i) x^s
+ 108    iSeriesConductance(i) g^s
+ 109    iSeriesSusceptance(i) b^s
+ 110    iChargingSusceptance(i) b^c
+ 111    iTapRatio(i) tau^tr
+ 112    iPhaseShift(i) theta^tr;
+ 113   
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 3
+pscopf
+C o m p i l a t i o n
+
+
+ 114  * branch performance limits
+ 115  parameters
+ 116    iPowerMagnitudeMax(i) s^max;
+ 117   
+ 118  * generator performance limits
+ 119  parameters
+ 120    lRealPowerMin(l) "p^gen,min"
+ 121    lRealPowerMax(l) "p^gen,max"
+ 122    lReactivePowerMin(l) "q^gen,min"
+ 123    lReactivePowerMax(l) "q^gen,max";
+ 124   
+ 125  * generator cost characteristics
+ 126  parameters
+ 127    lmRealPowerCostCoefficient(l,m)
+ 128    lmRealPowerCostExponent(l,m);
+ 129   
+ 130  * contingency modeling parameters
+ 131  parameters
+ 132    penaltyCoeff /1000/
+ 133    lParticipationFactor(l);
+ 134   
+GDXIN   C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf_data.gdx
+--- LOAD  circuits = 2:circuits
+--- LOAD  branches = 3:branches
+--- LOAD  buses = 4:buses
+--- LOAD  cases = 71:cases
+--- LOAD  generators = 6:generators
+--- LOAD  polynomialCostTerms = 7:polynomialCostTerms
+--- LOAD  units = 8:units
+--- LOAD  ijOrigin = 44:ijOrigin
+--- LOAD  ijDestination = 45:ijDestination
+--- LOAD  icMap = 46:icMap
+--- LOAD  ljMap = 47:ljMap
+--- LOAD  luMap = 48:luMap
+--- LOAD  ikInactive = 49:ikInactive
+--- LOAD  lkInactive = 50:lkInactive
+--- LOAD  kBase = 72:kBase
+--- LOAD  baseMVA = 1:BaseMVA
+--- LOAD  jBaseKV = 51:jBaseKV
+--- LOAD  jShuntConductance = 52:jShuntConductance
+--- LOAD  jShuntSusceptance = 53:jShuntSusceptance
+--- LOAD  jVoltageMagnitudeMin = 54:jVoltageMagnitudeMin
+--- LOAD  jVoltageMagnitudeMax = 55:jVoltageMagnitudeMax
+--- LOAD  jRealPowerDemand = 56:jRealPowerDemand
+--- LOAD  jReactivePowerDemand = 57:jReactivePowerDemand
+--- LOAD  iSeriesResistance = 58:iSeriesResistance
+--- LOAD  iSeriesReactance = 59:iSeriesReactance
+--- LOAD  iChargingSusceptance = 60:iChargingSusceptance
+--- LOAD  iTapRatio = 61:iTapRatio
+--- LOAD  iPhaseShift = 62:iPhaseShift
+--- LOAD  iPowerMagnitudeMax = 63:iPowerMagnitudeMax
+--- LOAD  lRealPowerMin = 64:lRealPowerMin
+--- LOAD  lRealPowerMax = 65:lRealPowerMax
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 4
+pscopf
+C o m p i l a t i o n
+
+
+--- LOAD  lReactivePowerMin = 66:lReactivePowerMin
+--- LOAD  lReactivePowerMax = 67:lReactivePowerMax
+--- LOAD  lmRealPowerCostCoefficient = 69:lmRealPowerCostCoefficient
+--- LOAD  lmRealPowerCostExponent = 70:lmRealPowerCostExponent
+--- LOAD  lParticipationFactor = 68:lParticipationFactor
+ 173   
+ 174  * solution
+ 175  parameter
+ 176    modelStatus /0/
+ 177    solveStatus /0/;
+ 178   
+ 179  * technical variables
+ 180  variables
+ 181    lkRealPower(l,k)
+ 182    lkReactivePower(l,k)
+ 183    jkVoltageMagnitude(j,k)
+ 184    jkVoltageAngle(j,k)
+ 185    jkShuntRealPower(j,k) bus to shunt
+ 186    jkShuntReactivePower(j,k) bus to shunt
+ 187    ikRealPowerOrigin(i,k) bus to branch
+ 188    ikReactivePowerOrigin(i,k) bus to branch
+ 189    ikRealPowerDestination(i,k) bus to branch
+ 190    ikReactivePowerDestination(i,k) bus to branch
+ 191    kRealPowerShortfall(k) missing real power that must be made up by increased generation;
+ 192   
+ 193  * violation variables
+ 194  positive variables
+ 195    jkVoltageMagnitudeViolationPos(j,k)
+ 196    jkVoltageMagnitudeViolationNeg(j,k);
+ 197   
+ 198  * cost variables
+ 199  variables
+ 200    obj
+ 201    penalty
+ 202    cost;
+ 203   
+ 204  * equations
+ 205  equations
+ 206    objDef
+ 207    penaltyDef
+ 208    costDef
+ 209    jkRealPowerBalance(j,k)
+ 210    jkReactivePowerBalance(j,k)
+ 211    ikPowerMagnitudeOriginBound(i,k)
+ 212    ikPowerMagnitudeDestinationBound(i,k)
+ 213    jkShuntRealPowerDef(j,k)
+ 214    jkShuntReactivePowerDef(j,k)
+ 215    ijjkRealPowerOriginDef(i,j1,j2,k)
+ 216    ijjkReactivePowerOriginDef(i,j1,j2,k)
+ 217    ijjkRealPowerDestinationDef(i,j1,j2,k)
+ 218    ijjkReactivePowerDestinationDef(i,j1,j2,k)
+ 219    ijjkVoltageMagnitudeSeriesImpedanceZeroEq(i,j1,j2,k)
+ 220    ijjkVoltageAngleSeriesImpedanceZeroEq(i,j1,j2,k)
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 5
+pscopf
+C o m p i l a t i o n
+
+
+ 221    ikRealPowerSeriesImpedanceZeroEq(i,k)
+ 222    ijjkReactivePowerSeriesImpedanceZeroEq(i,j1,j2,k)
+ 223    lkRealPowerRecoveryDef(l,k)
+ 224    jkVoltageMagnitudeMaintenance(j,k)
+ 225    jkVoltageMagnitudeMaintenanceViolationDef(j,k);
+ 226   
+ 227  * model
+ 228  model
+ 229    pscopf_strict /
+ 230      costDef
+ 231      jkRealPowerBalance
+ 232      jkReactivePowerBalance
+ 233      ikPowerMagnitudeOriginBound
+ 234      ikPowerMagnitudeDestinationBound
+ 235      jkShuntRealPowerDef
+ 236      jkShuntReactivePowerDef
+ 237      ijjkRealPowerOriginDef
+ 238      ijjkReactivePowerOriginDef
+ 239      ijjkRealPowerDestinationDef
+ 240      ijjkReactivePowerDestinationDef
+ 241      ijjkVoltageMagnitudeSeriesImpedanceZeroEq
+ 242      ijjkVoltageAngleSeriesImpedanceZeroEq
+ 243      ikRealPowerSeriesImpedanceZeroEq
+ 244      ijjkReactivePowerSeriesImpedanceZeroEq
+ 245      lkRealPowerRecoveryDef
+ 246      jkVoltageMagnitudeMaintenance /
+ 247    pscopf_pen /
+ 248      objDef
+ 249      penaltyDef
+ 250      costDef
+ 251      jkRealPowerBalance
+ 252      jkReactivePowerBalance
+ 253      ikPowerMagnitudeOriginBound
+ 254      ikPowerMagnitudeDestinationBound
+ 255      jkShuntRealPowerDef
+ 256      jkShuntReactivePowerDef
+ 257      ijjkRealPowerOriginDef
+ 258      ijjkReactivePowerOriginDef
+ 259      ijjkRealPowerDestinationDef
+ 260      ijjkReactivePowerDestinationDef
+ 261      ijjkVoltageMagnitudeSeriesImpedanceZeroEq
+ 262      ijjkVoltageAngleSeriesImpedanceZeroEq
+ 263      ikRealPowerSeriesImpedanceZeroEq
+ 264      ijjkReactivePowerSeriesImpedanceZeroEq
+ 265      lkRealPowerRecoveryDef
+ 266      jkVoltageMagnitudeMaintenanceViolationDef/;
+ 267   
+ 268  * process into per unit for optimization model
+ 269  jShuntConductance(j) = jShuntConductance(j) / baseMVA;
+ 270  jShuntSusceptance(j) = jShuntSusceptance(j) / baseMVA;
+ 271  *jVoltageMagnitudeMin(j)
+ 272  *jVoltageMagnitudeMax(j)
+ 273  jRealPowerDemand(j) = jRealPowerDemand(j) / baseMVA;
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 6
+pscopf
+C o m p i l a t i o n
+
+
+ 274  jReactivePowerDemand(j) = jReactivePowerDemand(j) / baseMVA;
+ 275  *iSeriesResistance(i)
+ 276  *iSeriesReactance(i)
+ 277  *iChargingSusceptance(i)
+ 278  *iTapRatio(i)
+ 279  *iPhaseShift(i)
+ 280  iPowerMagnitudeMax(i) = iPowerMagnitudeMax(i) / baseMVA;
+ 281  lRealPowerMin(l) = lRealPowerMin(l) / baseMVA;
+ 282  lRealPowerMax(l) = lRealPowerMax(l) / baseMVA;
+ 283  lReactivePowerMin(l) = lReactivePowerMin(l) / baseMVA;
+ 284  lReactivePowerMax(l) = lReactivePowerMax(l) / baseMVA;
+ 285  lmRealPowerCostCoefficient(l,m) = lmRealPowerCostCoefficient(l,m) * power(baseMVA,lmRealPowerCostExponent(l,m));
+ 286  *lmRealPowerCostExponent(l,m);
+ 287   
+ 288  * setup some sets
+ 289  ijjOriginDestination(i,j1,j2)$(ijOrigin(i,j1) and ijDestination(i,j2)) = yes;
+ 290  ikActive(i,k) = not ikInactive(i,k);
+ 291  lkActive(l,k) = not lkInactive(l,k);
+ 292   
+ 293  * data checks
+ 294  loop(i,
+ 295    if(sum(j$ijOrigin(i,j),1) > 1,
+ 296      abort 'branch with multiple origins';);
+ 297    if(sum(j$ijOrigin(i,j),1) < 1,
+ 298      abort 'branch with no origin';);
+ 299    if(sum(j$ijDestination(i,j),1) > 1,
+ 300      abort 'branch with multiple destinations';);
+ 301    if(sum(j$ijDestination(i,j),1) < 1,
+ 302      abort 'branch with no destination';);
+ 303    if(sum(c$icMap(i,c),1) > 1,
+ 304      abort 'branch with multiple circuit ids';);
+ 305    if(sum(c$icMap(i,c),1) < 1,
+ 306      abort 'branch with no circuit ids';);
+ 307  );
+ 308  loop(l,
+ 309    if(sum(j$ljMap(l,j),1) > 1,
+ 310      abort 'generator with multiple connection buses';
+ 311    );
+ 312    if(sum(j$ljMap(l,j),1) < 1,
+ 313      abort 'generator with no connection bus';
+ 314    );
+ 315    if(sum(u$luMap(l,u),1) > 1,
+ 316      abort 'generator with unit ids';
+ 317    );
+ 318    if(sum(u$luMap(l,u),1) < 1,
+ 319      abort 'generator with no unit id';
+ 320    );
+ 321  );
+ 322  if(card(kBase) > 1,
+ 323    abort 'more than one base case';);
+ 324  if(card(kBase) < 1,
+ 325    abort 'less than one base case';);
+ 326  loop(k$(not kBase(k)),
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 7
+pscopf
+C o m p i l a t i o n
+
+
+ 327    if(sum(l$lkActive(l,k),abs(lParticipationFactor(l))) = 0,
+ 328      abort 'contingency with no active participating generators';);
+ 329  );
+ 330   
+ 331  *lParticipationFactor(l) = lParticipationFactor(l) / sum(l0,lParticipationFactor(l0));
+ 332   
+ 333  * compute line parameters
+ 334  iSeriesImpedanceNonzero(i) = (
+ 335    abs(iSeriesResistance(i)) gt 0 or
+ 336    abs(iSeriesReactance(i)) gt 0);
+ 337  iSeriesImpedanceZero(i) = (
+ 338    not iSeriesImpedanceNonzero(i));
+ 339  iSeriesConductance(i)$iSeriesImpedanceNonzero(i)
+ 340    = iSeriesResistance(i)
+ 341    / (sqr(iSeriesResistance(i)) + sqr(iSeriesReactance(i)));
+ 342  iSeriesSusceptance(i)$iSeriesImpedanceNonzero(i)
+ 343    = -iSeriesReactance(i)
+ 344    / (sqr(iSeriesResistance(i)) + sqr(iSeriesReactance(i)));
+ 345   
+ 346  * bounds
+ 347  lkRealPower.lo(l,k)$lkActive(l,k) = lRealPowerMin(l);
+ 348  lkReactivePower.lo(l,k)$lkActive(l,k) = lReactivePowerMin(l);
+ 349  jkVoltageMagnitude.lo(j,k) = jVoltageMagnitudeMin(j);
+ 350  lkRealPower.up(l,k)$lkActive(l,k) = lRealPowerMax(l);
+ 351  lkReactivePower.up(l,k)$lkActive(l,k) = lReactivePowerMax(l);
+ 352  jkVoltageMagnitude.up(j,k) = jVoltageMagnitudeMax(j);
+ 353   
+ 354  * equation definitions
+ 355   
+ 356  * general objective
+ 357  objDef..
+ 358        obj
+ 359    =e= cost
+ 360     +  penaltyCoeff * penalty;
+ 361   
+ 362  * penalty
+ 363  penaltyDef..
+ 364        penalty
+ 365    =e= sum((j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)),
+ 366            jkVoltageMagnitudeViolationPos(j,k)
+ 367          + jkVoltageMagnitudeViolationNeg(j,k));
+ 368   
+ 369  * generation cost
+ 370  costDef..
+ 371        cost
+ 372    =e= sum(k$kBase(k),
+ 373          sum(l$lkActive(l,k),
+ 374                sum(m$(abs(lmRealPowerCostExponent(l,m)) > 0),
+ 375                    lmRealPowerCostCoefficient(l,m)
+ 376                  * power(lkRealPower(l,k),lmRealPowerCostExponent(l,m)))
+ 377              + sum(m$(abs(lmRealPowerCostExponent(l,m)) = 0),
+ 378                    lmRealPowerCostCoefficient(l,m))));
+ 379   
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 8
+pscopf
+C o m p i l a t i o n
+
+
+ 380  * power in = power out
+ 381  jkRealPowerBalance(j,k)..
+ 382        sum(l$(lkActive(l,k) and ljMap(l,j)),lkRealPower(l,k))
+ 383    =e= jkShuntRealPower(j,k)
+ 384     +  sum(i$(ikActive(i,k) and ijOrigin(i,j)),ikRealPowerOrigin(i,k))
+ 385     +  sum(i$(ikActive(i,k) and ijDestination(i,j)),ikRealPowerDestination(i,k))
+ 386     +  jRealPowerDemand(j);
+ 387   
+ 388  * power in = power out
+ 389  jkReactivePowerBalance(j,k)..
+ 390        sum(l$(lkActive(l,k) and ljMap(l,j)),lkReactivePower(l,k))
+ 391    =e= jkShuntReactivePower(j,k)
+ 392     +  sum(i$(ikActive(i,k) and ijOrigin(i,j)),ikReactivePowerOrigin(i,k))
+ 393     +  sum(i$(ikActive(i,k) and ijDestination(i,j)),ikReactivePowerDestination(i,k))
+ 394     +  jReactivePowerDemand(j);
+ 395   
+ 396  ikPowerMagnitudeOriginBound(i,k)$ikActive(i,k)..
+ 397        sqrt(1 + sqr(ikRealPowerOrigin(i,k)) + sqr(ikReactivePowerOrigin(i,k)))
+ 398    =l= sqrt(1 + sqr(iPowerMagnitudeMax(i)));
+ 399   
+ 400  ikPowerMagnitudeDestinationBound(i,k)$ikActive(i,k)..
+ 401        sqrt(1 + sqr(ikRealPowerDestination(i,k)) + sqr(ikReactivePowerDestination(i,k)))
+ 402    =l= sqrt(1 + sqr(iPowerMagnitudeMax(i)));
+ 403   
+ 404  jkShuntRealPowerDef(j,k)..
+ 405        jkShuntRealPower(j,k)
+ 406    =e= jShuntConductance(j)*sqr(jkVoltageMagnitude(j,k));
+ 407   
+ 408  jkShuntReactivePowerDef(j,k)..
+ 409        jkShuntReactivePower(j,k)
+ 410    =e= -jShuntSusceptance(j)*sqr(jkVoltageMagnitude(j,k));
+ 411   
+ 412  ijjkRealPowerOriginDef(i,j1,j2,k)$(ijjOriginDestination(i,j1,j2) and iSeriesImpedanceNonzero(i) and ikActive(i,k))..
+ 413        ikRealPowerOrigin(i,k)
+ 414    =e= (iSeriesConductance(i)/sqr(iTapRatio(i)))*sqr(jkVoltageMagnitude(j1,k))
+ 415     +  (-iSeriesConductance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*cos(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i))
+ 416     +  (iSeriesSusceptance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*sin(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i));
+ 417   
+ 418  ijjkReactivePowerOriginDef(i,j1,j2,k)$(ijjOriginDestination(i,j1,j2) and iSeriesImpedanceNonzero(i) and ikActive(i,k))..
+ 419        ikReactivePowerOrigin(i,k)
+ 420    =e= ((-iSeriesSusceptance(i)-0.5*iChargingSusceptance(i))/sqr(iTapRatio(i)))*sqr(jkVoltageMagnitude(j1,k))
+ 421     +  (iSeriesSusceptance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*cos(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i))
+ 422     +  (iSeriesConductance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*sin(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i));
+ 423   
+ 424  ijjkRealPowerDestinationDef(i,j1,j2,k)$(ijjOriginDestination(i,j1,j2) and iSeriesImpedanceNonzero(i) and ikActive(i,k))..
+ 425        ikRealPowerDestination(i,k)
+ 426    =e= iSeriesConductance(i)*sqr(jkVoltageMagnitude(j2,k))
+ 427     +  (-iSeriesConductance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*cos(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i))
+ 428     +  (-iSeriesSusceptance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*sin(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i));
+ 429   
+ 430  ijjkReactivePowerDestinationDef(i,j1,j2,k)$(ijjOriginDestination(i,j1,j2) and iSeriesImpedanceNonzero(i) and ikActive(i,k))..
+ 431        ikReactivePowerDestination(i,k)
+ 432    =e= (-iSeriesSusceptance(i)-0.5*iChargingSusceptance(i))*sqr(jkVoltageMagnitude(j2,k))
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                 09/29/16 12:53:17 Page 9
+pscopf
+C o m p i l a t i o n
+
+
+ 433     +  (iSeriesSusceptance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*cos(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i))
+ 434     +  (-iSeriesConductance(i)/iTapRatio(i))*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)*sin(jkVoltageAngle(j2,k) - jkVoltageAngle(j1,k) + iPhaseShift(i));
+ 435   
+ 436  ijjkVoltageMagnitudeSeriesImpedanceZeroEq(i,j1,j2,k)$(ijjOriginDestination(i,j1,j2) and iSeriesImpedanceZero(i) and ikActive(i,k))..
+ 437        jkVoltageMagnitude(j2,k)
+ 438     -  jkVoltageMagnitude(j1,k)/iTapRatio(i)
+ 439    =e= 0;
+ 440   
+ 441  ijjkVoltageAngleSeriesImpedanceZeroEq(i,j1,j2,k)$(ijjOriginDestination(i,j1,j2) and iSeriesImpedanceZero(i) and ikActive(i,k))..
+ 442        jkVoltageAngle(j2,k)
+ 443     -  jkVoltageAngle(j1,k)
+ 444     +  iPhaseShift(i)
+ 445    =e= 0;
+ 446   
+ 447  ikRealPowerSeriesImpedanceZeroEq(i,k)$(iSeriesImpedanceZero(i) and ikActive(i,k))..
+ 448        ikRealPowerOrigin(i,k)
+ 449     +  ikRealPowerDestination(i,k)
+ 450    =e= 0;
+ 451   
+ 452  ijjkReactivePowerSeriesImpedanceZeroEq(i,j1,j2,k)$(iSeriesImpedanceZero(i) and ijjOriginDestination(i,j1,j2) and ikActive(i,k))..
+ 453        ikReactivePowerOrigin(i,k)
+ 454     +  ikReactivePowerDestination(i,k)
+ 455     +  iChargingSusceptance(i)*jkVoltageMagnitude(j1,k)*jkVoltageMagnitude(j2,k)/iTapRatio(i)
+ 456    =e= 0;
+ 457   
+ 458  lkRealPowerRecoveryDef(l,k)$(lkActive(l,k) and not kBase(k))..
+ 459        lkRealPower(l,k)
+ 460    =e= sum(k0$kBase(k0),lkRealPower(l,k0))
+ 461     +  lParticipationFactor(l)*kRealPowerShortfall(k);
+ 462   
+ 463  jkVoltageMagnitudeMaintenance(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+ 464        jkVoltageMagnitude(j,k)
+ 465    =e= sum(k0$kBase(k0),jkVoltageMagnitude(j,k0));
+ 466   
+ 467  jkVoltageMagnitudeMaintenanceViolationDef(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+ 468        jkVoltageMagnitude(j,k)
+ 469     -  sum(k0$kBase(k0),jkVoltageMagnitude(j,k0))
+ 470    =e= jkVoltageMagnitudeViolationPos(j,k)
+ 471     -  jkVoltageMagnitudeViolationNeg(j,k);
+ 472   
+ 473  * set a start point
+ 474  *$ontext
+ 475  lkRealPower.l(l,k)$lkActive(l,k) = uniform(lRealPowerMin(l),lRealPowerMax(l));
+ 476  lkReactivePower.l(l,k)$lkActive(l,k) = uniform(lReactivePowerMin(l),lReactivePowerMax(l));
+ 477  jkVoltageMagnitude.l(j,k) = uniform(jVoltageMagnitudeMin(j),jVoltageMagnitudeMax(j));
+ 478  jkVoltageAngle.l(j,k) = normal(0,1);
+ 479  jkShuntRealPower.l(j,k) = normal(0,1);
+ 480  jkShuntReactivePower.l(j,k) = normal(0,1);
+ 481  ikRealPowerOrigin.l(i,k)$ikActive(i,k) = normal(0,1);
+ 482  ikReactivePowerOrigin.l(i,k)$ikActive(i,k) = normal(0,1);
+ 483  ikRealPowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
+ 484  ikReactivePowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
+ 485  *$offtext
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 10
+pscopf
+C o m p i l a t i o n
+
+
+ 486   
+ 487  * solve
+ 489  solve pscopf_pen using nlp minimizing obj;
+ 490  modelStatus = pscopf_pen.modelstat;
+ 491  solveStatus = pscopf_pen.solvestat;
+ 494   
+ 495  * translate back to physical units
+ 496  jRealPowerDemand(j) = baseMVA * jRealPowerDemand(j);
+ 497  jReactivePowerDemand(j) = baseMVA * jReactivePowerDemand(j);
+ 498  jkVoltageMagnitude.l(j,k) = jBaseKV(j) * jkVoltageMagnitude.l(j,k);
+ 499  lkRealPower.l(l,k)$lkActive(l,k) = baseMVA * lkRealPower.l(l,k);
+ 500  lkReactivePower.l(l,k)$lkActive(l,k) = baseMVA * lkReactivePower.l(l,k);
+ 501  kRealPowerShortfall.l(k) = baseMVA * sum(l$lkActive(l,k), lParticipationFactor(l)) * kRealPowerShortfall.l(k);
+ 502   
+ 503  * output
+INCLUDE    C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf_output_format0.gms
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 11
+pscopf_output_format0
+C o m p i l a t i o n
+
+
+      My preferred output format
+ 509   
+ 511  file outputfile0 /'out0.txt'/;
+ 512  *outputfile.nw = 0;
+ 513  *outputfile.nr = 3;
+ 514  *outputfile.nd = 6;
+ 515  put outputfile0;
+ 516  put '--model status' /;
+ 517  put 'model_status({1,2} : OK, > 2 : not OK)' /;
+ 518  put modelStatus:0:0 /;
+ 519  put '--end of model status' /;
+ 520  put '--solve status' /;
+ 521  put 'solve_status(1 : OK, > 1: not OK)' /;
+ 522  put solveStatus:0:0 /;
+ 523  put '--end of solve status' /;
+ 524  put '--cost' /;
+ 525  put 'cost(dol)' /;
+ 526  put cost.l:0:10 /;
+ 527  put '--end of cost' /;
+ 528  put '--time' /;
+ 529  put 'time(s)' /;
+ 530  put timeelapsed:0:10 /;
+ 531  put '--end of time' /;
+ 532  put '--generator dispatch' /;
+ 533  put 'generator_id,real_power(MW),reactive_power(MVar)' /;
+ 534  loop(kBase(k),
+ 535    loop(l,
+ 536      put l.tl:0 ',' lkRealPower.l(l,k):0:10 ',' lkReactivePower.l(l,k):0:10 /;
+ 537  *    put ord(l):0:0 ',' lkRealPower.l(l,k):0:10 ',' lkReactivePower.l(l,k):0:10 /;
+ 538    );
+ 539  );
+ 540  put '--end of generator dispatch' /;
+ 541  put '--bus voltage' /;
+ 542  put 'bus_id,voltage_magnitude(kV),voltage_angle(rad)' /;
+ 543  loop(kBase(k),
+ 544    loop(j,
+ 545      put k.tl:0 ',' j.tl:0 ',' jkVoltageMagnitude.l(j,k):0:10 ',' jkVoltageAngle.l(j,k):0:10 /;
+ 546    );
+ 547  );
+ 548  put '--end of bus voltage' /;
+ 549  put '--contingency generator dispatch' /;
+ 550  put 'contingency_id,generator_id,real_power(MW),reactive_power(MVar)' /;
+ 551  loop(k,
+ 552    loop(l,
+ 553      put k.tl:0 ',' l.tl:0 ',' lkRealPower.l(l,k):0:10 ',' lkReactivePower.l(l,k):0:10 /;
+ 554    );
+ 555  );
+ 556  put '--end of contingency generator dispatch' /;
+ 557  put '--contingency bus voltage' /;
+ 558  put 'contingency_id,bus_id,voltage_magnitude(kV),voltage_angle(rad)' /;
+ 559  loop(k,
+ 560    loop(j,
+ 561      put k.tl:0 ',' j.tl:0 ',' jkVoltageMagnitude.l(j,k):0:10 ',' jkVoltageAngle.l(j,k):0:10 /;
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 12
+pscopf_output_format0
+C o m p i l a t i o n
+
+
+ 562    );
+ 563  );
+ 564  put '--end of contingency bus voltage' /;
+ 565  put '--contingency real power shortfall' /;
+ 566  put 'contingency_id,real_power_shortfall(MW)' /;
+ 567  loop(k,
+ 568    put k.tl:0 ',' kRealPowerShortfall.l(k):0:10 /;
+ 569  );
+ 570  put '--end of contingency real power shortfall' /;
+ 571  putclose outputfile0;
+INCLUDE    C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf_output_format1.gms
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 13
+pscopf_output_format1
+C o m p i l a t i o n
+
+
+      Official competition output format
+ 577   
+ 579  file outputfile1 /'out1.txt'/;
+ 580  *outputfile.nw = 0;
+ 581  *outputfile.nr = 3;
+ 582  *outputfile.nd = 6;
+ 583  put outputfile1;
+ 584  put '--performance' /;
+ 585  put 'time(s),objective value' /;
+ 586  put timeelapsed:0:10 ',' cost.l:0:10 /;
+ 587  put '--end of performance' /;
+ 588  put '--generation dispatch' /;
+ 589  put 'bus id,unit id,pg(mw),qg(mvar)' /;
+ 590  loop(kBase(k),
+ 591    loop((l,j,u)$(ljMap(l,j) and luMap(l,u)),
+ 592      put j.tl:0 ',' u.tl:0 ',' lkRealPower.l(l,k):0:10 ',' lkReactivePower.l(l,k):0:10 /;
+ 593    );
+ 594  );
+ 595  put '--end of generation dispatch' /;
+ 596  put '--pqvo' /;
+ 597  put 'contingency id,bus id,p(mw),q(mvar),v(kv),theta(radians)' /;
+ 598  loop(kBase(k),
+ 599    loop(j,
+ 600      put '0,' j.tl:0 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkRealPower.l(l,k)) - jRealPowerDemand(j)):0:10 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePower.l(l,k)) - jReactivePowerDemand(j)):0:10 ',' jkVoltageMagnitude.l(j,k):0:10 ',' jk
+      VoltageAngle.l(j,k):0:10 /;
+ 601    );
+ 602  );
+ 603  loop(k$(not kBase(k)),
+ 604    loop(j,
+ 605      put k.tl:0 ',' j.tl:0 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkRealPower.l(l,k)) - jRealPowerDemand(j)):0:10 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePower.l(l,k)) - jReactivePowerDemand(j)):0:10 ',' jkVoltageMagnitude.l(j,k):0:10 
+      ',' jkVoltageAngle.l(j,k):0:10 /;
+ 606    );
+ 607  );
+ 608  put '--end of pqvo' /;
+ 609  put '--Delta' /;
+ 610  put 'contingency id,Delta' /;
+ 611  loop(k$(not kBase(k)),
+ 612    put k.tl:0 ',' kRealPowerShortfall.l(k):0:10 /;
+ 613  );
+ 614  put '--end of Delta' /;
+ 615  putclose outputfile1;
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 14
+pscopf_output_format1
+Include File Summary
+
+
+   SEQ   GLOBAL TYPE      PARENT   LOCAL  FILENAME
+
+     1        1 INPUT          0       0  C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf.gms
+     2      135 GDXIN          1     135  C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf_data.gdx
+     3      504 INCLUDE        1     508  .C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf_output_format0.gms
+     4      572 INCLUDE        1     509  .C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf_output_format1.gms
+
+
+COMPILATION TIME     =        0.562 SECONDS     83 MB  24.7.3 r58181 WEX-WEI
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 15
+pscopf_output_format1
+Equation Listing    SOLVE pscopf_pen Using NLP From line 489
+
+
+---- objDef  =E=  
+
+objDef..  obj - 1000*penalty - cost =E= 0 ; (LHS = 0)
+     
+
+---- penaltyDef  =E=  
+
+penaltyDef..  - jkVoltageMagnitudeViolationPos(j1,k2) - jkVoltageMagnitudeViolationPos(j1,k3) - jkVoltageMagnitudeViolationPos(j2,k1) - jkVoltageMagnitudeViolationPos(j2,k3) - jkVoltageMagnitudeViolationNeg(j1,k2) - jkVoltageMagnitudeViolationNeg(j1,k3)
+     
+      - jkVoltageMagnitudeViolationNeg(j2,k1) - jkVoltageMagnitudeViolationNeg(j2,k3) + penalty =E= 0 ; (LHS = 0)
+     
+
+---- costDef  =E=  
+
+costDef..  - (1343.494264)*lkRealPower(l1,baseCase) - (1602.275808)*lkRealPower(l2,baseCase) + cost =E= 200 ; (LHS = -593.066150575739, INFES = 793.066150575739 ****)
+     
+
+---- jkRealPowerBalance  =E=  
+
+jkRealPowerBalance(j1,baseCase)..  lkRealPower(l1,baseCase) - jkShuntRealPower(j1,baseCase) - ikRealPowerOrigin(i1,baseCase) =E= 0.4 ; (LHS = 0.166745837057377, INFES = 0.233254162942623 ****)
+     
+jkRealPowerBalance(j1,k1)..  - jkShuntRealPower(j1,k1) - ikRealPowerOrigin(i1,k1) =E= 0.4 ; (LHS = 0.746145135212896, INFES = 0.346145135212896 ****)
+     
+jkRealPowerBalance(j1,k2)..  lkRealPower(l1,k2) - jkShuntRealPower(j1,k2) - ikRealPowerOrigin(i1,k2) =E= 0.4 ; (LHS = 1.08189676955486, INFES = 0.681896769554856 ****)
+     
+REMAINING 5 ENTRIES SKIPPED
+
+
+---- jkReactivePowerBalance  =E=  
+
+jkReactivePowerBalance(j1,baseCase)..  lkReactivePower(l1,baseCase) - jkShuntReactivePower(j1,baseCase) - ikReactivePowerOrigin(i1,baseCase) =E= 0 ; (LHS = -1.88323977679451, INFES = 1.88323977679451 ****)
+     
+jkReactivePowerBalance(j1,k1)..  - jkShuntReactivePower(j1,k1) - ikReactivePowerOrigin(i1,k1) =E= 0 ; (LHS = 0.118581767908412, INFES = 0.118581767908412 ****)
+     
+jkReactivePowerBalance(j1,k2)..  lkReactivePower(l1,k2) - jkShuntReactivePower(j1,k2) - ikReactivePowerOrigin(i1,k2) =E= 0 ; (LHS = 3.67575771451905, INFES = 3.67575771451905 ****)
+     
+REMAINING 5 ENTRIES SKIPPED
+
+
+---- ikPowerMagnitudeOriginBound  =L=  
+
+ikPowerMagnitudeOriginBound(i1,baseCase)..  (0.540766242610464)*ikRealPowerOrigin(i1,baseCase) + (0.64629454287575)*ikReactivePowerOrigin(i1,baseCase) =L= 1.4142135623731 ; (LHS = 1.85735296474619, INFES = 0.443139402373097 ****)
+     
+ikPowerMagnitudeOriginBound(i1,k1)..  - (0.498477137274814)*ikRealPowerOrigin(i1,k1) + (0.558958331024511)*ikReactivePowerOrigin(i1,k1) =L= 1.4142135623731 ; (LHS = 1.50912475019269, INFES = 0.0949111878195947 ****)
+     
+ikPowerMagnitudeOriginBound(i1,k2)..  (0.397438882426589)*ikRealPowerOrigin(i1,k2) - (0.752090855845841)*ikReactivePowerOrigin(i1,k2) =L= 1.4142135623731 ; (LHS = 1.90208386415475, INFES = 0.487870301781654 ****)
+     
+
+---- ikPowerMagnitudeDestinationBound  =L=  
+
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 16
+pscopf_output_format1
+Equation Listing    SOLVE pscopf_pen Using NLP From line 489
+
+
+     ikPowerMagnitudeDestinationBound  =L=  
+
+ikPowerMagnitudeDestinationBound(i1,baseCase)..  (0.736392517842919)*ikRealPowerDestination(i1,baseCase) + (0.578512045762585)*ikReactivePowerDestination(i1,baseCase) =L= 1.4142135623731 ; (LHS = 2.85075185670758, INFES = 1.43653829433449 ****)
+     
+ikPowerMagnitudeDestinationBound(i1,k1)..  (0.3849198289706)*ikRealPowerDestination(i1,k1) + (0.724632369011485)*ikReactivePowerDestination(i1,k1) =L= 1.4142135623731 ; (LHS = 1.74942671401024, INFES = 0.335213151637146 ****)
+     
+ikPowerMagnitudeDestinationBound(i1,k2)..  (0.0815953236407064)*ikRealPowerDestination(i1,k2) + (0.871838609287012)*ikReactivePowerDestination(i1,k2) =L= 1.4142135623731 ; (LHS = 2.07061242841522, INFES = 0.656398866042121 ****)
+     
+
+---- jkShuntRealPowerDef  =E=  
+
+jkShuntRealPowerDef(j1,baseCase)..  jkShuntRealPower(j1,baseCase) =E= 0 ; (LHS = -0.999392489004581, INFES = 0.999392489004581 ****)
+     
+jkShuntRealPowerDef(j1,k1)..  jkShuntRealPower(j1,k1) =E= 0 ; (LHS = 0.00611905005372406, INFES = 0.00611905005372406 ****)
+     
+jkShuntRealPowerDef(j1,k2)..  jkShuntRealPower(j1,k2) =E= 0 ; (LHS = -0.994592146806168, INFES = 0.994592146806168 ****)
+     
+REMAINING 5 ENTRIES SKIPPED
+
+
+---- jkShuntReactivePowerDef  =E=  
+
+jkShuntReactivePowerDef(j1,baseCase)..  jkShuntReactivePower(j1,baseCase) =E= 0 ; (LHS = -0.218174284515045, INFES = 0.218174284515045 ****)
+     
+jkShuntReactivePowerDef(j1,k1)..  jkShuntReactivePower(j1,k1) =E= 0 ; (LHS = -0.962119619583899, INFES = 0.962119619583899 ****)
+     
+jkShuntReactivePowerDef(j1,k2)..  jkShuntReactivePower(j1,k2) =E= 0 ; (LHS = -0.107595751236343, INFES = 0.107595751236343 ****)
+     
+REMAINING 5 ENTRIES SKIPPED
+
+
+---- ijjkRealPowerOriginDef  =E=  
+
+ijjkRealPowerOriginDef(i1,j1,j2,baseCase)..  - (5.69524172099178)*jkVoltageMagnitude(j1,baseCase) + (6.2306347935842)*jkVoltageMagnitude(j2,baseCase) - (4.31947853092096)*jkVoltageAngle(j1,baseCase) + (4.31947853092096)*jkVoltageAngle(j2,baseCase)
+     
+      + ikRealPowerOrigin(i1,baseCase) =E= 0 ; (LHS = 0.780236198500837, INFES = 0.780236198500837 ****)
+     
+ijjkRealPowerOriginDef(i1,j1,j2,k1)..  - (8.72816913872289)*jkVoltageMagnitude(j1,k1) + (1.99001843503775)*jkVoltageMagnitude(j2,k1) + (6.81250890349687)*jkVoltageAngle(j1,k1) - (6.81250890349687)*jkVoltageAngle(j2,k1) + ikRealPowerOrigin(i1,k1) =E= 0 ;
+     
+      (LHS = -4.39997061503818, INFES = 4.39997061503818 ****)
+     
+ijjkRealPowerOriginDef(i1,j1,j2,k2)..  - (1.97955276401067)*jkVoltageMagnitude(j1,k2) + (6.52358122755015)*jkVoltageMagnitude(j2,k2) - (0.593426963185108)*jkVoltageAngle(j1,k2) + (0.593426963185108)*jkVoltageAngle(j2,k2) + ikRealPowerOrigin(i1,k2) =E= 0 ;
+     
+      (LHS = 3.21128463887263, INFES = 3.21128463887263 ****)
+     
+
+---- ijjkReactivePowerOriginDef  =E=  
+
+ijjkReactivePowerOriginDef(i1,j1,j2,baseCase)..  - (7.03814423923047)*jkVoltageMagnitude(j1,baseCase) + (4.63511317801116)*jkVoltageMagnitude(j2,baseCase) + (5.80635082495311)*jkVoltageAngle(j1,baseCase) - (5.80635082495311)*jkVoltageAngle(j2,baseCase)
+     
+      + ikReactivePowerOrigin(i1,baseCase) =E= 0 ; (LHS = -0.504602285758557, INFES = 0.504602285758557 ****)
+     
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 17
+pscopf_output_format1
+Equation Listing    SOLVE pscopf_pen Using NLP From line 489
+
+
+     ijjkReactivePowerOriginDef  =E=  
+
+ijjkReactivePowerOriginDef(i1,j1,j2,k1)..  - (16.9869759094485)*jkVoltageMagnitude(j1,k1) - (7.17094042529244)*jkVoltageMagnitude(j2,k1) + (1.89054956571678)*jkVoltageAngle(j1,k1) - (1.89054956571678)*jkVoltageAngle(j2,k1) + ikReactivePowerOrigin(i1,k1)
+      =E= 0 ; (LHS = -11.5016887913142, INFES = 11.5016887913142 ****)
+     
+ijjkReactivePowerOriginDef(i1,j1,j2,k2)..  - (8.61136956274875)*jkVoltageMagnitude(j1,k2) + (0.574032849043271)*jkVoltageMagnitude(j2,k2) + (6.74398512804386)*jkVoltageAngle(j1,k2) - (6.74398512804386)*jkVoltageAngle(j2,k2) + ikReactivePowerOrigin(i1,k2)
+      =E= 0 ; (LHS = -5.12148682994572, INFES = 5.12148682994572 ****)
+     
+
+---- ijjkRealPowerDestinationDef  =E=  
+
+ijjkRealPowerDestinationDef(i1,j1,j2,baseCase)..  (3.93313957269153)*jkVoltageMagnitude(j1,baseCase) - (4.68392254998884)*jkVoltageMagnitude(j2,baseCase) + (5.80635082495311)*jkVoltageAngle(j1,baseCase) - (5.80635082495311)*jkVoltageAngle(j2,baseCase)
+     
+      + ikRealPowerDestination(i1,baseCase) =E= 0 ; (LHS = 2.07652952344021, INFES = 2.07652952344021 ****)
+     
+ijjkRealPowerDestinationDef(i1,j1,j2,k1)..  - (6.47299947638246)*jkVoltageMagnitude(j1,k1) - (16.6711014912924)*jkVoltageMagnitude(j2,k1) + (1.89054956571678)*jkVoltageAngle(j1,k1) - (1.89054956571678)*jkVoltageAngle(j2,k1) + ikRealPowerDestination(i1,k1)
+      =E= 0 ; (LHS = -10.6517728859406, INFES = 10.6517728859406 ****)
+     
+ijjkRealPowerDestinationDef(i1,j1,j2,k2)..  (0.640754018285247)*jkVoltageMagnitude(j1,k2) - (9.76382436895673)*jkVoltageMagnitude(j2,k2) + (6.74398512804386)*jkVoltageAngle(j1,k2) - (6.74398512804386)*jkVoltageAngle(j2,k2) + ikRealPowerDestination(i1,k2)
+      =E= 0 ; (LHS = -4.58118533857162, INFES = 4.58118533857162 ****)
+     
+
+---- ijjkReactivePowerDestinationDef  =E=  
+
+ijjkReactivePowerDestinationDef(i1,j1,j2,baseCase)..  (5.28702435700821)*jkVoltageMagnitude(j1,baseCase) - (3.0790818986878)*jkVoltageMagnitude(j2,baseCase) - (4.31947853092096)*jkVoltageAngle(j1,baseCase) + (4.31947853092096)*jkVoltageAngle(j2,baseCase)
+     
+      + ikReactivePowerDestination(i1,baseCase) =E= 0 ; (LHS = 3.11766598989646, INFES = 3.11766598989646 ****)
+     
+ijjkReactivePowerDestinationDef(i1,j1,j2,k1)..  (1.79633179527711)*jkVoltageMagnitude(j1,k1) - (7.50064246989625)*jkVoltageMagnitude(j2,k1) + (6.81250890349687)*jkVoltageAngle(j1,k1) - (6.81250890349687)*jkVoltageAngle(j2,k1)
+     
+      + ikReactivePowerDestination(i1,k1) =E= 0 ; (LHS = -1.34989957108111, INFES = 1.34989957108111 ****)
+     
+ijjkReactivePowerDestinationDef(i1,j1,j2,k2)..  (7.28183220198932)*jkVoltageMagnitude(j1,k2) - (3.80393813323185)*jkVoltageMagnitude(j2,k2) - (0.593426963185108)*jkVoltageAngle(j1,k2) + (0.593426963185108)*jkVoltageAngle(j2,k2)
+     
+      + ikReactivePowerDestination(i1,k2) =E= 0 ; (LHS = 3.21100395961103, INFES = 3.21100395961103 ****)
+     
+
+---- ijjkVoltageMagnitudeSeriesImpedanceZeroEq  =E=  
+
+                NONE
+
+
+---- ijjkVoltageAngleSeriesImpedanceZeroEq  =E=  
+
+                NONE
+
+
+---- ikRealPowerSeriesImpedanceZeroEq  =E=  
+
+                NONE
+
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 18
+pscopf_output_format1
+Equation Listing    SOLVE pscopf_pen Using NLP From line 489
+
+
+---- ijjkReactivePowerSeriesImpedanceZeroEq  =E=  
+
+                NONE
+
+
+---- lkRealPowerRecoveryDef  =E=  
+
+lkRealPowerRecoveryDef(l1,k2)..  - lkRealPower(l1,baseCase) + lkRealPower(l1,k2) - 0.25*kRealPowerShortfall(k2) =E= 0 ; (LHS = 0.671519576, INFES = 0.671519576 ****)
+     
+lkRealPowerRecoveryDef(l1,k3)..  - lkRealPower(l1,baseCase) + lkRealPower(l1,k3) - 0.25*kRealPowerShortfall(k3) =E= 0 ; (LHS = 0.378628224, INFES = 0.378628224 ****)
+     
+lkRealPowerRecoveryDef(l2,k1)..  - lkRealPower(l2,baseCase) + lkRealPower(l2,k1) - 0.25*kRealPowerShortfall(k1) =E= 0 ; (LHS = -0.00892578700000002, INFES = 0.00892578700000002 ****)
+     
+REMAINING ENTRY SKIPPED
+
+
+---- jkVoltageMagnitudeMaintenanceViolationDef  =E=  
+
+jkVoltageMagnitudeMaintenanceViolationDef(j1,k2)..  - jkVoltageMagnitude(j1,baseCase) + jkVoltageMagnitude(j1,k2) - jkVoltageMagnitudeViolationPos(j1,k2) + jkVoltageMagnitudeViolationNeg(j1,k2) =E= 0 ; (LHS = -0.1720881112, INFES = 0.1720881112 ****)
+     
+jkVoltageMagnitudeMaintenanceViolationDef(j1,k3)..  - jkVoltageMagnitude(j1,baseCase) + jkVoltageMagnitude(j1,k3) - jkVoltageMagnitudeViolationPos(j1,k3) + jkVoltageMagnitudeViolationNeg(j1,k3) =E= 0 ;
+     
+      (LHS = -0.0702828559999999, INFES = 0.0702828559999999 ****)
+     
+jkVoltageMagnitudeMaintenanceViolationDef(j2,k1)..  - jkVoltageMagnitude(j2,baseCase) + jkVoltageMagnitude(j2,k1) - jkVoltageMagnitudeViolationPos(j2,k1) + jkVoltageMagnitudeViolationNeg(j2,k1) =E= 0 ; (LHS = 0.0181125338, INFES = 0.0181125338 ****)
+     
+REMAINING ENTRY SKIPPED
+
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 19
+pscopf_output_format1
+Column Listing      SOLVE pscopf_pen Using NLP From line 489
+
+
+---- lkRealPower  
+
+lkRealPower(l1,baseCase)
+                (.LO, .L, .UP, .M = 0, 0.171747132, 1, 0)
+   (-1343.4943) costDef
+        1       jkRealPowerBalance(j1,baseCase)
+       -1       lkRealPowerRecoveryDef(l1,k2)
+       -1       lkRealPowerRecoveryDef(l1,k3)
+
+lkRealPower(l1,k2)
+                (.LO, .L, .UP, .M = 0, 0.843266708, 1, 0)
+        1       jkRealPowerBalance(j1,k2)
+        1       lkRealPowerRecoveryDef(l1,k2)
+
+lkRealPower(l1,k3)
+                (.LO, .L, .UP, .M = 0, 0.550375356, 1, 0)
+        1       jkRealPowerBalance(j1,k3)
+        1       lkRealPowerRecoveryDef(l1,k3)
+
+REMAINING 3 ENTRIES SKIPPED
+
+---- lkReactivePower  
+
+lkReactivePower(l1,baseCase)
+                (.LO, .L, .UP, .M = -3, -0.901016976, 3, 0)
+        1       jkReactivePowerBalance(j1,baseCase)
+
+lkReactivePower(l1,k2)
+                (.LO, .L, .UP, .M = -3, 2.137622082, 3, 0)
+        1       jkReactivePowerBalance(j1,k2)
+
+lkReactivePower(l1,k3)
+                (.LO, .L, .UP, .M = -3, -2.597317662, 3, 0)
+        1       jkReactivePowerBalance(j1,k3)
+
+REMAINING 3 ENTRIES SKIPPED
+
+---- jkVoltageMagnitude  
+
+jkVoltageMagnitude(j1,baseCase)
+                (.LO, .L, .UP, .M = 0.9, 1.0982266078, 1.1, 0)
+      (-5.6952) ijjkRealPowerOriginDef(i1,j1,j2,baseCase)
+      (-7.0381) ijjkReactivePowerOriginDef(i1,j1,j2,baseCase)
+       (3.9331) ijjkRealPowerDestinationDef(i1,j1,j2,baseCase)
+       (5.287)  ijjkReactivePowerDestinationDef(i1,j1,j2,baseCase)
+       -1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k2)
+       -1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k3)
+
+jkVoltageMagnitude(j1,k1)
+                (.LO, .L, .UP, .M = 0.9, 1.0524500934, 1.1, 0)
+      (-8.7282) ijjkRealPowerOriginDef(i1,j1,j2,k1)
+     (-16.987)  ijjkReactivePowerOriginDef(i1,j1,j2,k1)
+      (-6.473)  ijjkRealPowerDestinationDef(i1,j1,j2,k1)
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 20
+pscopf_output_format1
+Column Listing      SOLVE pscopf_pen Using NLP From line 489
+
+
+     jkVoltageMagnitude  
+
+       (1.7963) ijjkReactivePowerDestinationDef(i1,j1,j2,k1)
+
+jkVoltageMagnitude(j1,k2)
+                (.LO, .L, .UP, .M = 0.9, 0.9261384966, 1.1, 0)
+      (-1.9796) ijjkRealPowerOriginDef(i1,j1,j2,k2)
+      (-8.6114) ijjkReactivePowerOriginDef(i1,j1,j2,k2)
+       (0.6408) ijjkRealPowerDestinationDef(i1,j1,j2,k2)
+       (7.2818) ijjkReactivePowerDestinationDef(i1,j1,j2,k2)
+        1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k2)
+
+REMAINING 5 ENTRIES SKIPPED
+
+---- jkVoltageAngle  
+
+jkVoltageAngle(j1,baseCase)
+                (.LO, .L, .UP, .M = -INF, -1.29900651331309, +INF, 0)
+      (-4.3195) ijjkRealPowerOriginDef(i1,j1,j2,baseCase)
+       (5.8064) ijjkReactivePowerOriginDef(i1,j1,j2,baseCase)
+       (5.8064) ijjkRealPowerDestinationDef(i1,j1,j2,baseCase)
+      (-4.3195) ijjkReactivePowerDestinationDef(i1,j1,j2,baseCase)
+
+jkVoltageAngle(j1,k1)
+                (.LO, .L, .UP, .M = -INF, -1.37547395903746, +INF, 0)
+       (6.8125) ijjkRealPowerOriginDef(i1,j1,j2,k1)
+       (1.8905) ijjkReactivePowerOriginDef(i1,j1,j2,k1)
+       (1.8905) ijjkRealPowerDestinationDef(i1,j1,j2,k1)
+       (6.8125) ijjkReactivePowerDestinationDef(i1,j1,j2,k1)
+
+jkVoltageAngle(j1,k2)
+                (.LO, .L, .UP, .M = -INF, 0.31967997022056, +INF, 0)
+      (-0.5934) ijjkRealPowerOriginDef(i1,j1,j2,k2)
+       (6.744)  ijjkReactivePowerOriginDef(i1,j1,j2,k2)
+       (6.744)  ijjkRealPowerDestinationDef(i1,j1,j2,k2)
+      (-0.5934) ijjkReactivePowerDestinationDef(i1,j1,j2,k2)
+
+REMAINING 3 ENTRIES SKIPPED
+
+---- jkShuntRealPower  bus to shunt
+
+jkShuntRealPower(j1,baseCase)
+                (.LO, .L, .UP, .M = -INF, -0.999392489004581, +INF, 0)
+       -1       jkRealPowerBalance(j1,baseCase)
+        1       jkShuntRealPowerDef(j1,baseCase)
+
+jkShuntRealPower(j1,k1)
+                (.LO, .L, .UP, .M = -INF, 0.00611905005372406, +INF, 0)
+       -1       jkRealPowerBalance(j1,k1)
+        1       jkShuntRealPowerDef(j1,k1)
+
+jkShuntRealPower(j1,k2)
+                (.LO, .L, .UP, .M = -INF, -0.994592146806168, +INF, 0)
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 21
+pscopf_output_format1
+Column Listing      SOLVE pscopf_pen Using NLP From line 489
+
+
+     jkShuntRealPower  bus to shunt
+
+       -1       jkRealPowerBalance(j1,k2)
+        1       jkShuntRealPowerDef(j1,k2)
+
+REMAINING 5 ENTRIES SKIPPED
+
+---- jkShuntReactivePower  bus to shunt
+
+jkShuntReactivePower(j1,baseCase)
+                (.LO, .L, .UP, .M = -INF, -0.218174284515045, +INF, 0)
+       -1       jkReactivePowerBalance(j1,baseCase)
+        1       jkShuntReactivePowerDef(j1,baseCase)
+
+jkShuntReactivePower(j1,k1)
+                (.LO, .L, .UP, .M = -INF, -0.962119619583899, +INF, 0)
+       -1       jkReactivePowerBalance(j1,k1)
+        1       jkShuntReactivePowerDef(j1,k1)
+
+jkShuntReactivePower(j1,k2)
+                (.LO, .L, .UP, .M = -INF, -0.107595751236343, +INF, 0)
+       -1       jkReactivePowerBalance(j1,k2)
+        1       jkShuntReactivePowerDef(j1,k2)
+
+REMAINING 5 ENTRIES SKIPPED
+
+---- ikRealPowerOrigin  bus to branch
+
+ikRealPowerOrigin(i1,baseCase)
+                (.LO, .L, .UP, .M = -INF, 1.0043937839472, +INF, 0)
+       -1       jkRealPowerBalance(j1,baseCase)
+       (0.5408) ikPowerMagnitudeOriginBound(i1,baseCase)
+        1       ijjkRealPowerOriginDef(i1,j1,j2,baseCase)
+
+ikRealPowerOrigin(i1,k1)
+                (.LO, .L, .UP, .M = -INF, -0.75226418526662, +INF, 0)
+       -1       jkRealPowerBalance(j1,k1)
+      (-0.4985) ikPowerMagnitudeOriginBound(i1,k1)
+        1       ijjkRealPowerOriginDef(i1,j1,j2,k1)
+
+ikRealPowerOrigin(i1,k2)
+                (.LO, .L, .UP, .M = -INF, 0.755962085251311, +INF, 0)
+       -1       jkRealPowerBalance(j1,k2)
+       (0.3974) ikPowerMagnitudeOriginBound(i1,k2)
+        1       ijjkRealPowerOriginDef(i1,j1,j2,k2)
+
+
+---- ikReactivePowerOrigin  bus to branch
+
+ikReactivePowerOrigin(i1,baseCase)
+                (.LO, .L, .UP, .M = -INF, 1.20039708530956, +INF, 0)
+       -1       jkReactivePowerBalance(j1,baseCase)
+       (0.6463) ikPowerMagnitudeOriginBound(i1,baseCase)
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 22
+pscopf_output_format1
+Column Listing      SOLVE pscopf_pen Using NLP From line 489
+
+
+     ikReactivePowerOrigin  bus to branch
+
+        1       ijjkReactivePowerOriginDef(i1,j1,j2,baseCase)
+
+ikReactivePowerOrigin(i1,k1)
+                (.LO, .L, .UP, .M = -INF, 0.843537851675487, +INF, 0)
+       -1       jkReactivePowerBalance(j1,k1)
+       (0.559)  ikPowerMagnitudeOriginBound(i1,k1)
+        1       ijjkReactivePowerOriginDef(i1,j1,j2,k1)
+
+ikReactivePowerOrigin(i1,k2)
+                (.LO, .L, .UP, .M = -INF, -1.43053988128271, +INF, 0)
+       -1       jkReactivePowerBalance(j1,k2)
+      (-0.7521) ikPowerMagnitudeOriginBound(i1,k2)
+        1       ijjkReactivePowerOriginDef(i1,j1,j2,k2)
+
+
+---- ikRealPowerDestination  bus to branch
+
+ikRealPowerDestination(i1,baseCase)
+                (.LO, .L, .UP, .M = -INF, 2.09927233750627, +INF, 0)
+       -1       jkRealPowerBalance(j2,baseCase)
+       (0.7364) ikPowerMagnitudeDestinationBound(i1,baseCase)
+        1       ijjkRealPowerDestinationDef(i1,j1,j2,baseCase)
+
+ikRealPowerDestination(i1,k1)
+                (.LO, .L, .UP, .M = -INF, 0.673389031553421, +INF, 0)
+       -1       jkRealPowerBalance(j2,k1)
+       (0.3849) ikPowerMagnitudeDestinationBound(i1,k1)
+        1       ijjkRealPowerDestinationDef(i1,j1,j2,k1)
+
+ikRealPowerDestination(i1,k2)
+                (.LO, .L, .UP, .M = -INF, 0.168952291231009, +INF, 0)
+       -1       jkRealPowerBalance(j2,k2)
+       (0.0816) ikPowerMagnitudeDestinationBound(i1,k2)
+        1       ijjkRealPowerDestinationDef(i1,j1,j2,k2)
+
+
+---- ikReactivePowerDestination  bus to branch
+
+ikReactivePowerDestination(i1,baseCase)
+                (.LO, .L, .UP, .M = -INF, 1.64919428858539, +INF, 0)
+       -1       jkReactivePowerBalance(j2,baseCase)
+       (0.5785) ikPowerMagnitudeDestinationBound(i1,baseCase)
+        1       ijjkReactivePowerDestinationDef(i1,j1,j2,baseCase)
+
+ikReactivePowerDestination(i1,k1)
+                (.LO, .L, .UP, .M = -INF, 1.26769122418522, +INF, 0)
+       -1       jkReactivePowerBalance(j2,k1)
+       (0.7246) ikPowerMagnitudeDestinationBound(i1,k1)
+        1       ijjkReactivePowerDestinationDef(i1,j1,j2,k1)
+
+ikReactivePowerDestination(i1,k2)
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 23
+pscopf_output_format1
+Column Listing      SOLVE pscopf_pen Using NLP From line 489
+
+
+     ikReactivePowerDestination  bus to branch
+
+                (.LO, .L, .UP, .M = -INF, 1.80523985996192, +INF, 0)
+       -1       jkReactivePowerBalance(j2,k2)
+       (0.8718) ikPowerMagnitudeDestinationBound(i1,k2)
+        1       ijjkReactivePowerDestinationDef(i1,j1,j2,k2)
+
+
+---- kRealPowerShortfall  missing real power that must be made up by increased generation
+
+kRealPowerShortfall(k1)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -0.25    lkRealPowerRecoveryDef(l2,k1)
+
+kRealPowerShortfall(k2)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -0.25    lkRealPowerRecoveryDef(l1,k2)
+
+kRealPowerShortfall(k3)
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -0.25    lkRealPowerRecoveryDef(l1,k3)
+       -0.25    lkRealPowerRecoveryDef(l2,k3)
+
+
+---- jkVoltageMagnitudeViolationPos  
+
+jkVoltageMagnitudeViolationPos(j1,k2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       penaltyDef
+       -1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k2)
+
+jkVoltageMagnitudeViolationPos(j1,k3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       penaltyDef
+       -1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k3)
+
+jkVoltageMagnitudeViolationPos(j2,k1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       penaltyDef
+       -1       jkVoltageMagnitudeMaintenanceViolationDef(j2,k1)
+
+REMAINING ENTRY SKIPPED
+
+---- jkVoltageMagnitudeViolationNeg  
+
+jkVoltageMagnitudeViolationNeg(j1,k2)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       penaltyDef
+        1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k2)
+
+jkVoltageMagnitudeViolationNeg(j1,k3)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       penaltyDef
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 24
+pscopf_output_format1
+Column Listing      SOLVE pscopf_pen Using NLP From line 489
+
+
+     jkVoltageMagnitudeViolationNeg  
+
+        1       jkVoltageMagnitudeMaintenanceViolationDef(j1,k3)
+
+jkVoltageMagnitudeViolationNeg(j2,k1)
+                (.LO, .L, .UP, .M = 0, 0, +INF, 0)
+       -1       penaltyDef
+        1       jkVoltageMagnitudeMaintenanceViolationDef(j2,k1)
+
+REMAINING ENTRY SKIPPED
+
+---- obj  
+
+obj
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+        1       objDef
+
+
+---- penalty  
+
+penalty
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+    -1000       objDef
+        1       penaltyDef
+
+
+---- cost  
+
+cost
+                (.LO, .L, .UP, .M = -INF, 0, +INF, 0)
+       -1       objDef
+        1       costDef
+
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 25
+pscopf_output_format1
+Model Statistics    SOLVE pscopf_pen Using NLP From line 489
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          19     SINGLE EQUATIONS           61
+BLOCKS OF VARIABLES          16     SINGLE VARIABLES           68
+NON ZERO ELEMENTS           171     NON LINEAR N-Z             62
+DERIVATIVE POOL              20     CONSTANT POOL              20
+CODE LENGTH                 336
+
+
+GENERATION TIME      =        0.016 SECONDS     83 MB  24.7.3 r58181 WEX-WEI
+
+
+EXECUTION TIME       =        0.031 SECONDS     83 MB  24.7.3 r58181 WEX-WEI
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 26
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   pscopf_pen          OBJECTIVE  obj
+     TYPE    NLP                 DIRECTION  MINIMIZE
+     SOLVER  KNITRO              FROM LINE  489
+
+**** SOLVER STATUS     1 Normal Completion         
+**** MODEL STATUS      2 Locally Optimal           
+**** OBJECTIVE VALUE             1320.1757
+
+ RESOURCE USAGE, LIMIT          0.187      1000.000
+ ITERATION COUNT, LIMIT         0    2000000000
+ EVALUATION ERRORS              0             0
+
+KNITRO           24.7.3 r58181 Released Jul 11, 2016 WEI x86 64bit/MS Windows 
+
+Artelys Knitro Optimizer 10.1.0
+
+=======================================
+          Commercial License
+         Artelys Knitro 10.1.0
+=======================================
+
+Knitro presolve eliminated 24 variables 
+and 24 constraints.
+
+hessian_no_f:         1
+maxtime_real:         1000
+par_concurrent_evals: 0
+Knitro changing algorithm from AUTO to 1.
+Knitro changing bar_initpt from AUTO to 3.
+Knitro changing bar_murule from AUTO to 4.
+Knitro changing bar_penaltycons from AUTO to 1.
+Knitro changing bar_penaltyrule from AUTO to 2.
+Knitro changing bar_switchrule from AUTO to 2.
+Knitro changing linsolver from AUTO to 2.
+Knitro shifted start point to satisfy presolved bounds (24 variables).
+Knitro fixing 16 variables eliminated from the presolve.
+Knitro reinitializing 8 variables eliminated from the presolve.
+
+Problem Characteristics                    ( Presolved)
+-----------------------
+Objective goal:  Minimize
+Number of variables:                    67 (        43)
+    bounded below:                       8 (         8)
+    bounded above:                       0 (         0)
+    bounded below and above:            20 (        20)
+    fixed:                               0 (         0)
+    free:                               39 (        15)
+Number of constraints:                  60 (        36)
+    linear equalities:                  41 (        18)
+    nonlinear equalities:               13 (        12)
+    linear inequalities:                 0 (         0)
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 27
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+    nonlinear inequalities:              6 (         6)
+    range:                               0 (         0)
+Number of nonzeros in Jacobian:        168 (       110)
+Number of nonzeros in Hessian:          50 (        50)
+
+  Iter      Objective      FeasError   OptError    ||Step||    CGits 
+--------  --------------  ----------  ----------  ----------  -------
+       0   8.713066e+003  1.150e+001
+      10   2.583746e+004  5.455e+000  7.832e+001  1.442e-001        0
+      20   2.088299e+003  1.734e+000  5.976e+001  4.576e-002        0
+      30   6.573696e+003  5.482e+000  6.166e+001  8.084e-002        0
+      40   1.851138e+003  8.589e-001  8.589e-001  4.016e-002        1
+      50   1.317764e+006  3.075e+001  1.245e+002  1.782e+001       35
+      60   1.920335e+006  1.572e+000  1.185e+002  2.698e+002        0
+      70   8.031669e+003  5.506e-006  3.009e+000  7.729e+002        0
+      72   1.320176e+003  2.855e-007  7.979e-005  2.221e-002        0
+
+EXIT: Locally optimal solution found.
+
+Final Statistics
+----------------
+Final objective value               =  1.32017568274129e+003
+Final feasibility error (abs / rel) =   2.86e-007 / 2.48e-008
+Final optimality error  (abs / rel) =   7.98e-005 / 7.10e-007
+# of iterations                     =         72 
+# of CG iterations                  =         72 
+# of function evaluations           =         89
+# of gradient evaluations           =         74
+# of Hessian evaluations            =         73
+Total program time (secs)           =       0.064 (     0.031 CPU time)
+Time spent in evaluations (secs)    =       0.002
+
+===============================================================================
+
+Solve finished: status = optimal
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- EQU objDef              .              .              .             1.0000      
+---- EQU penaltyDef          .              .              .          1000.0000      
+---- EQU costDef          200.0000       200.0000       200.0000         1.0000      
+
+---- EQU jkRealPowerBalance  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase         0.4000         0.4000         0.4000      1800.0000      
+j1.k1               0.4000         0.4000         0.4000   4.5928237E-5      
+j1.k2               0.4000         0.4000         0.4000   1.5379489E-5      
+j1.k3               0.4000         0.4000         0.4000   -2.285688E-6      
+j2.baseCase         0.4000         0.4000         0.4000      1800.0000      
+j2.k1               0.4000         0.4000         0.4000   1.5317663E-5      
+j2.k2               0.4000         0.4000         0.4000   4.8022368E-5      
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 28
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+     EQU jkRealPowerBalance  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j2.k3               0.4000         0.4000         0.4000   -3.576928E-6      
+
+---- EQU jkReactivePowerBalance  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase          .              .              .       -7.323344E-8      
+j1.k1                .              .              .       1.6629058E-5      
+j1.k2                .              .              .       3.3121716E-7      
+j1.k3                .              .              .       -3.47125E-21      
+j2.baseCase          .              .              .       -4.524812E-8      
+j2.k1                .              .              .       3.4942176E-7      
+j2.k2                .              .              .       1.8479111E-5      
+j2.k3                .              .              .       -5.99196E-22      
+
+---- EQU ikPowerMagnitudeOriginBound  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+i1.baseCase        -INF            1.0000         1.4142   -8.784440E-6      
+i1.k1              -INF            1.0770         1.4142   -1.109426E-5      
+i1.k2              -INF            1.0835         1.4142   -1.119993E-5      
+
+---- EQU ikPowerMagnitudeDestinationBound  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+i1.baseCase        -INF            1.0000         1.4142   -8.784675E-6      
+i1.k1              -INF            1.0835         1.4142   -1.118980E-5      
+i1.k2              -INF            1.0770         1.4142   -1.087943E-5      
+
+---- EQU jkShuntRealPowerDef  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase          .              .              .          1800.0000      
+j1.k1                .              .              .       4.5928237E-5      
+j1.k2                .              .              .       1.5379489E-5      
+j1.k3                .              .              .       -2.285688E-6      
+j2.baseCase          .              .              .          1800.0000      
+j2.k1                .              .              .       1.5317663E-5      
+j2.k2                .              .              .       4.8022368E-5      
+j2.k3                .              .              .       -3.576928E-6      
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 29
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+---- EQU jkShuntReactivePowerDef  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase          .              .              .             EPS         
+j1.k1                .              .              .       1.6629058E-5      
+j1.k2                .              .              .             EPS         
+j1.k3                .              .              .       -3.47125E-21      
+j2.baseCase          .              .              .             EPS         
+j2.k1                .              .              .             EPS         
+j2.k2                .              .              .       1.8479111E-5      
+j2.k3                .              .              .       -5.99196E-22      
+
+---- EQU ijjkRealPowerOriginDef  
+
+                         LOWER          LEVEL          UPPER         MARGINAL
+
+i1.j1.j2.baseCase          .              .              .          1800.0000      
+i1.j1.j2.k1                .       -2.808124E-7          .       4.1808730E-5      
+i1.j1.j2.k2                .       2.2518631E-7          .       1.9869265E-5      
+
+---- EQU ijjkReactivePowerOriginDef  
+
+                         LOWER          LEVEL          UPPER         MARGINAL
+
+i1.j1.j2.baseCase          .              .              .       -1.181891E-7      
+i1.j1.j2.k1                .       1.2958517E-7          .       1.6629345E-5      
+i1.j1.j2.k2                .       -9.603199E-8          .       4.0544562E-7      
+
+---- EQU ijjkRealPowerDestinationDef  
+
+                         LOWER          LEVEL          UPPER         MARGINAL
+
+i1.j1.j2.baseCase          .              .              .          1800.0000      
+i1.j1.j2.k1                .       2.8553697E-7          .       1.9812803E-5      
+i1.j1.j2.k2                .       -2.214355E-7          .       4.3982348E-5      
+
+---- EQU ijjkReactivePowerDestinationDef  
+
+                         LOWER          LEVEL          UPPER         MARGINAL
+
+i1.j1.j2.baseCase          .              .              .       -9.020494E-8      
+i1.j1.j2.k1                .       -1.213870E-7          .       4.2358305E-7      
+i1.j1.j2.k2                .       1.0249813E-7          .       1.8479342E-5      
+
+---- EQU ijjkVoltageMagnitudeSeriesImpedanceZeroEq  
+
+                NONE
+
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 30
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+---- EQU lkRealPowerRecoveryDef  
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+l1.k2          .              .              .             EPS         
+l1.k3          .              .              .       -6.456535E-7      
+l2.k1          .              .              .             EPS         
+l2.k3          .              .              .       6.4565349E-7      
+
+---- EQU jkVoltageMagnitudeMaintenanceViolationDef  
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+j1.k2          .              .              .            -0.0002      
+j1.k3          .              .              .       9.9714537E-5      
+j2.k1          .              .              .            -0.0002      
+j2.k3          .              .              .       6.5572980E-5      
+
+---- VAR lkRealPower  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+l1.baseCase          .             0.4000         1.0000   2.9307030E-6      
+l1.k2                .             0.8170         1.0000   -1.537949E-5      
+l1.k3                .             0.4000         1.0000   2.9313411E-6      
+l2.baseCase          .             0.4000         1.0000   2.9305928E-6      
+l2.k1                .             0.8170         1.0000   -1.531766E-5      
+l2.k3                .             0.4000         1.0000   2.9312748E-6      
+
+---- VAR lkReactivePower  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+l1.baseCase        -3.0000        -0.0051         3.0000   7.3233440E-8      
+l1.k2              -3.0000         0.0072         3.0000   -3.312172E-7      
+l1.k3              -3.0000   -4.53481E-28         3.0000         EPS         
+l2.baseCase        -3.0000        -0.0051         3.0000   4.5248120E-8      
+l2.k1              -3.0000         0.0072         3.0000   -3.494218E-7      
+l2.k3              -3.0000   -9.07304E-28         3.0000         EPS         
+
+---- VAR jkVoltageMagnitude  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase         0.9000         1.0117         1.1000        -0.0001      
+j1.k1               0.9000         0.9701         1.1000         0.0001      
+j1.k2               0.9000         1.0117         1.1000   5.0157029E-5      
+j1.k3               0.9000         1.0117         1.1000   -9.971454E-5      
+j2.baseCase         0.9000         1.0117         1.1000        -0.0001      
+j2.k1               0.9000         1.0117         1.1000   3.7891832E-5      
+j2.k2               0.9000         0.9701         1.1000         0.0001      
+j2.k3               0.9000         1.0117         1.1000   -6.557298E-5      
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 31
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+---- VAR jkVoltageAngle  
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase        -INF           -1.1865        +INF            EPS         
+j1.k1              -INF            5.4736        +INF            EPS         
+j1.k2              -INF            0.4023        +INF            EPS         
+j2.baseCase        -INF           -1.1865        +INF            EPS         
+j2.k1              -INF           -0.7683        +INF            EPS         
+j2.k2              -INF            0.3611        +INF            EPS         
+
+---- VAR jkShuntRealPower  bus to shunt
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase        -INF             .            +INF            EPS         
+j1.k1              -INF             .            +INF            EPS         
+j1.k2              -INF             .            +INF            EPS         
+j1.k3              -INF             .            +INF            EPS         
+j2.baseCase        -INF             .            +INF            EPS         
+j2.k1              -INF             .            +INF            EPS         
+j2.k2              -INF             .            +INF            EPS         
+j2.k3              -INF             .            +INF            EPS         
+
+---- VAR jkShuntReactivePower  bus to shunt
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+j1.baseCase        -INF             .            +INF            EPS         
+j1.k1              -INF             .            +INF            EPS         
+j1.k2              -INF             .            +INF            EPS         
+j1.k3              -INF             .            +INF            EPS         
+j2.baseCase        -INF             .            +INF            EPS         
+j2.k1              -INF             .            +INF            EPS         
+j2.k2              -INF             .            +INF            EPS         
+j2.k3              -INF             .            +INF            EPS         
+
+---- VAR ikRealPowerOrigin  bus to branch
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+i1.baseCase        -INF      -1.81645E-12        +INF            EPS         
+i1.k1              -INF           -0.4000        +INF            EPS         
+i1.k2              -INF            0.4170        +INF            EPS         
+
+---- VAR ikReactivePowerOrigin  bus to branch
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+i1.baseCase        -INF           -0.0051        +INF            EPS         
+i1.k1              -INF      -2.27798E-12        +INF            EPS         
+i1.k2              -INF            0.0072        +INF            EPS         
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 32
+pscopf_output_format1
+Solution Report     SOLVE pscopf_pen Using NLP From line 489
+
+
+---- VAR ikRealPowerDestination  bus to branch
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+i1.baseCase        -INF      -2.06462E-12        +INF            EPS         
+i1.k1              -INF            0.4170        +INF            EPS         
+i1.k2              -INF           -0.4000        +INF            EPS         
+
+---- VAR ikReactivePowerDestination  bus to branch
+
+                   LOWER          LEVEL          UPPER         MARGINAL
+
+i1.baseCase        -INF           -0.0051        +INF            EPS         
+i1.k1              -INF            0.0072        +INF            EPS         
+i1.k2              -INF      -2.57023E-12        +INF            EPS         
+
+---- VAR kRealPowerShortfall  missing real power that must be made up by increased generation
+
+          LOWER          LEVEL          UPPER         MARGINAL
+
+k1        -INF            1.6680        +INF            EPS         
+k2        -INF            1.6680        +INF            EPS         
+k3        -INF      7.763953E-12        +INF            EPS         
+
+---- VAR jkVoltageMagnitudeViolationPos  
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+j1.k2          .       2.1848039E-6        +INF          999.9998      
+j1.k3          .       7.9790188E-5        +INF         1000.0001      
+j2.k1          .       3.5606558E-6        +INF          999.9998      
+j2.k3          .       3.5498797E-6        +INF         1000.0001      
+
+---- VAR jkVoltageMagnitudeViolationNeg  
+
+             LOWER          LEVEL          UPPER         MARGINAL
+
+j1.k2          .       2.0011618E-6        +INF         1000.0002      
+j1.k3          .       7.7624565E-5        +INF          999.9999      
+j2.k1          .       3.4451493E-6        +INF         1000.0002      
+j2.k3          .       3.5263469E-6        +INF          999.9999      
+
+                           LOWER          LEVEL          UPPER         MARGINAL
+
+---- VAR obj               -INF         1320.1757        +INF             .          
+---- VAR penalty           -INF            0.0002        +INF            EPS         
+---- VAR cost              -INF         1320.0000        +INF            EPS         
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+                             0     ERRORS
+GAMS 24.7.3  r58181 Released Jul 11, 2016 WEX-WEI x86 64bit/MS Windows                                                                                                                                                                09/29/16 12:53:17 Page 33
+pscopf_output_format1
+E x e c u t i o n
+
+
+**** REPORT FILE SUMMARY
+
+outputfile0 C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\out0.txt
+outputfile1 C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\out1.txt
+
+
+EXECUTION TIME       =        0.015 SECONDS     74 MB  24.7.3 r58181 WEX-WEI
+
+
+USER: Small MUD - 5 User License                     G160411:0805CO-WIN
+      Pacific Northwest National Laboratory                     DC12422
+
+
+**** FILE SUMMARY
+
+Input      C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf.gms
+Output     C:\Users\holz501\Documents\projects\arpa-e competition\pscopf\pscopf.lst

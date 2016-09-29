@@ -1,0 +1,17 @@
+$title pscopf_prepare_data
+$ontext
+adds some things to the data set
+e.g. base case
+need to check that 'baseCase' is not already an element of contingencies
+$offtext
+
+$if not set ingms $set ingms pscopf_data_temp.gms
+$if not set int_max $set int_max 1000000
+
+set baseCase /baseCase/;
+set nonnegativeIntegers /0*%int_max%/;
+$onempty
+$include '%ingms%'
+$offempty
+set cases /baseCase,set.contingencies/;
+set kBase(cases) /baseCase/;

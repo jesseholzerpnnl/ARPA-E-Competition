@@ -1,0 +1,55 @@
+--model status
+model_status({1,2} : OK, > 2 : not OK)
+2
+--end of model status
+--solve status
+solve_status(1 : OK, > 1: not OK)
+1
+--end of solve status
+--cost
+cost(dol)
+1319.9999999911
+--end of cost
+--time
+time(s)
+1.3440004550
+--end of time
+--generator dispatch
+generator_id,real_power(MW),reactive_power(MVar)
+l1,39.9999999998,-0.5117712911
+l2,39.9999999997,-0.5117708778
+--end of generator dispatch
+--bus voltage
+bus_id,voltage_magnitude(kV),voltage_angle(rad)
+baseCase,j1,116.3458143680,-1.1864983667
+baseCase,j2,232.6916288398,-1.1864983674
+--end of bus voltage
+--contingency generator dispatch
+contingency_id,generator_id,real_power(MW),reactive_power(MVar)
+baseCase,l1,39.9999999998,-0.5117712911
+baseCase,l2,39.9999999997,-0.5117708778
+k1,l1,0.0000000000,0.0000000000
+k1,l2,81.7004022546,0.7180897905
+k2,l1,81.7004024297,0.7180897563
+k2,l2,0.0000000000,0.0000000000
+k3,l1,40.0000000000,0.0000000000
+k3,l2,39.9999999999,0.0000000000
+--end of contingency generator dispatch
+--contingency bus voltage
+contingency_id,bus_id,voltage_magnitude(kV),voltage_angle(rad)
+baseCase,j1,116.3458143680,-1.1864983667
+baseCase,j2,232.6916288398,-1.1864983674
+k1,j1,111.5608453641,5.4735960218
+k1,j2,232.6916554006,-0.7683420544
+k2,j1,116.3458354835,0.4023407210
+k2,j2,223.1217061475,0.3610934867
+k3,j1,116.3460634161,1.1870213406
+k3,j2,232.6916342542,-0.7240704010
+--end of contingency bus voltage
+--contingency real power shortfall
+contingency_id,real_power_shortfall(MW)
+baseCase,0.0000000000
+k1,41.7004022548
+k2,41.7004024300
+k3,0.0000000004
+--end of contingency real power shortfall

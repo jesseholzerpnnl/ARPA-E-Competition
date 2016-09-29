@@ -1,0 +1,11 @@
+
+--- Job pscopf_data.gms Start 09/16/16 14:03:04 24.7.3 r58181 WEX-WEI x86 64bit/MS Windows
+GAMS 24.7.3   Copyright (C) 1987-2016 GAMS Development. All rights reserved
+Licensee: Small MUD - 5 User License                     G160411:0805CO-WIN
+          Pacific Northwest National Laboratory                     DC12422
+          License Admin: Nader Samaan, nader.samaan@pnnl.gov               
+--- Starting compilation
+--- pscopf_data.gms(145) 3 Mb
+--- Starting execution - empty program
+*** Status: Normal completion
+--- Job pscopf_data.gms Stop 09/16/16 14:03:04 elapsed 0:00:00.007
