@@ -514,5 +514,6 @@ kRealPowerShortfall.l(k) = baseMVA * kRealPowerShortfall.l(k);
 *kRealPowerShortfall.l(k) = 0;
 
 * output
-$include pscopf_output_format0.gms
-$include pscopf_output_format1.gms
+*$include pscopf_output_format0.gms
+*$include pscopf_output_format1.gms
+$include pscopf_write_solution.gms
