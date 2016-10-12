@@ -243,7 +243,8 @@ model
     ikRealPowerSeriesImpedanceZeroEq
     ijjkReactivePowerSeriesImpedanceZeroEq
     lkRealPowerRecoveryDef
-    jkVoltageMagnitudeMaintenance /
+    jkVoltageMagnitudeMaintenance
+ /
   pscopf_pen /
     objDef
     penaltyDef
@@ -263,7 +264,8 @@ model
     ikRealPowerSeriesImpedanceZeroEq
     ijjkReactivePowerSeriesImpedanceZeroEq
     lkRealPowerRecoveryDef
-    jkVoltageMagnitudeMaintenanceViolationDef/;
+    jkVoltageMagnitudeMaintenanceViolationDef
+/;
 
 * process into per unit for optimization model
 jShuntConductance(j) = jShuntConductance(j) / baseMVA;
@@ -313,7 +315,7 @@ loop(l,
     abort 'generator with no connection bus';
   );
   if(sum(u$luMap(l,u),1) > 1,
-    abort 'generator with unit ids';
+    abort 'generator with multiple unit ids';
   );
   if(sum(u$luMap(l,u),1) < 1,
     abort 'generator with no unit id';
@@ -458,7 +460,8 @@ ijjkReactivePowerSeriesImpedanceZeroEq(i,j1,j2,k)$(iSeriesImpedanceZero(i) and i
 lkRealPowerRecoveryDef(l,k)$(lkActive(l,k) and not kBase(k))..
       lkRealPower(l,k)
   =e= sum(k0$kBase(k0),lkRealPower(l,k0))
-   +  lParticipationFactor(l)*kRealPowerShortfall(k);
+   +  lParticipationFactor(l)*kRealPowerShortfall(k)
+   /  sum(l1$lkActive(l1,k),lParticipationFactor(l1));
 
 jkVoltageMagnitudeMaintenance(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
       jkVoltageMagnitude(j,k)
@@ -470,8 +473,12 @@ jkVoltageMagnitudeMaintenanceViolationDef(j,k)$(not kBase(k) and sum(l$(lkActive
   =e= jkVoltageMagnitudeViolationPos(j,k)
    -  jkVoltageMagnitudeViolationNeg(j,k);
 
+*lkActive(l,k) = lkActive(l,k) and (ord(k) = 1);
+*ikActive(i,k) = ikActive(i,k) and (ord(k) = 1);
+
 * set a start point
-*$ontext
+$ontext
+* random start point
 lkRealPower.l(l,k)$lkActive(l,k) = uniform(lRealPowerMin(l),lRealPowerMax(l));
 lkReactivePower.l(l,k)$lkActive(l,k) = uniform(lReactivePowerMin(l),lReactivePowerMax(l));
 jkVoltageMagnitude.l(j,k) = uniform(jVoltageMagnitudeMin(j),jVoltageMagnitudeMax(j));
@@ -482,7 +489,7 @@ ikRealPowerOrigin.l(i,k)$ikActive(i,k) = normal(0,1);
 ikReactivePowerOrigin.l(i,k)$ikActive(i,k) = normal(0,1);
 ikRealPowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
 ikReactivePowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
-*$offtext
+$offtext
 
 * solve
 $ifthen %model%==pen
@@ -496,13 +503,15 @@ modelStatus = pscopf_strict.modelstat;
 solveStatus = pscopf_strict.solvestat;
 $endif
 
-* translate back to physical units
+* translate back to data units
 jRealPowerDemand(j) = baseMVA * jRealPowerDemand(j);
 jReactivePowerDemand(j) = baseMVA * jReactivePowerDemand(j);
-jkVoltageMagnitude.l(j,k) = jBaseKV(j) * jkVoltageMagnitude.l(j,k);
+*jkVoltageMagnitude.l(j,k) = jBaseKV(j) * jkVoltageMagnitude.l(j,k);
+jkVoltageAngle.l(j,k) = 180 * jkVoltageAngle.l(j,k) / pi;
 lkRealPower.l(l,k)$lkActive(l,k) = baseMVA * lkRealPower.l(l,k);
 lkReactivePower.l(l,k)$lkActive(l,k) = baseMVA * lkReactivePower.l(l,k);
-kRealPowerShortfall.l(k) = baseMVA * sum(l$lkActive(l,k), lParticipationFactor(l)) * kRealPowerShortfall.l(k);
+kRealPowerShortfall.l(k) = baseMVA * kRealPowerShortfall.l(k);
+*kRealPowerShortfall.l(k) = 0;
 
 * output
 $include pscopf_output_format0.gms
