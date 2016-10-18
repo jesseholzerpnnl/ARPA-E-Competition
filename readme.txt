@@ -18,3 +18,6 @@ The solution output in the required format will be written to 'solution.txt'.
 The 'case' parameter is required.
 It gives the file name of a data set written in
 valid GAMS code.
+A log containing the GAMS console output is written to log.txt.
+The log shows the solver progress.
+The GAMS listing file is not preserved.
