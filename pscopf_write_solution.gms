@@ -1,6 +1,16 @@
 $title pscopf_write_solution
 $ontext
 Official competition output format
+adding some extra sections for debugging etc.
+solveStatus,modelstatus
+solvestatus
+1 - normal completion
+2 - iteration limit
+3 - time limit
+modelStatus
+2 - locally optimal
+3 - unbounded
+5 - locally infeasible
 $offtext
 
 $if not set outputfilename1 $set outputfilename1 'solution.txt'
@@ -53,4 +63,8 @@ loop(k$(not kBase(k)),
   );
 );
 put '--end of line flow' /;
+put '--status' /;
+put 'solveStatus,modelStatus' /;
+put solveStatus:0:0 ',' modelStatus:0:0 /;
+put '--end of status' /;
 putclose outputfile1;
