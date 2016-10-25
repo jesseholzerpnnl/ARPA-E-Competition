@@ -13,6 +13,8 @@ modelStatus
 5 - locally infeasible
 $offtext
 
+$if not set do_bad_output $set do_bad_output 0
+
 $if not set outputfilename1 $set outputfilename1 'solution.txt'
 file outputfile1 /'%outputfilename1%'/;
 *outputfile.nw = 0;
@@ -23,6 +25,14 @@ put '--performance' /;
 put 'time(s),objective value(dol)' /;
 put timeelapsed:0:10 ',' cost.l:0:10 /;
 put '--end of performance' /;
+$ifthen %do_bad_output%==1
+put '--generation dispatch' /;
+put 'bus id,unit id,pg(MW),qg(MVar)' /;
+put 'bus_id_err, unit_id_err, 0, 0' /;
+put 'bus_id_err, unit_id_err, 0' /;
+put 'bus_id_err, unit_id_err, 0, 0, 0' /;
+put '--end of generation dispatch' /;
+$endif
 put '--generation dispatch' /;
 put 'bus id,unit id,pg(MW),qg(MVar)' /;
 loop(kBase(k),
