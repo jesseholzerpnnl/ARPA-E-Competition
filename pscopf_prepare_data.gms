@@ -7,6 +7,7 @@ $offtext
 
 $if not set ingms $set ingms pscopf_data_temp.gms
 
+$offdigit
 $onempty
 $include '%ingms%'
 $offempty

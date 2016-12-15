@@ -33,15 +33,19 @@ $offtext
 $if not set ingdx $set ingdx pscopf_data.gdx
 
 * voltage magnitude deviation penalty
-$if not set voltage_penalty $set voltage_penalty 1000
+$if not set voltage_penalty $set voltage_penalty 1000000
+$if not set voltage_tolerance $set voltage_tolerance 1e-6
 
 * model:
 * pen
 * strict
 $if not set model $set model pen
 
+* solution
+$if not set solutionname $set solutionname solution
+
 * for testing:
-$if not set do_infeas $set do_infeas 1
+$if not set do_infeas $set do_infeas 0
 $if not set do_bad_output $set do_bad_output 0
 $if not set do_compile_error $set do_compile_error 0
 $if not set do_exec_error $set do_exec_error 0
@@ -57,7 +61,7 @@ abort 'added an execution error';
 $endif
 
 set baseCase /baseCase/;
-set nonnegativeIntegers /0*%int_max%/;
+*set nonnegativeIntegers /0*%int_max%/;
 
 sets
   circuits c
@@ -185,10 +189,26 @@ $loaddc lmRealPowerCostExponent
 $loaddc lParticipationFactor
 $gdxin
 
+* experiment
+iPowerMagnitudeMax(i) = 1.3*iPowerMagnitudeMax(i);
+*jRealPowerDemand(j) = 0.55*jRealPowerDemand(j);
+*jReactivePowerDemand(j) = 0.55*jReactivePowerDemand(j);
+
+*ikInactive(i,k) = no;
+*lkInactive(l,k) = no;
+
 * solution
 parameter
   modelStatus /0/
-  solveStatus /0/;
+  solveStatus /0/
+  lkReactivePowerSlackLo(l,k)
+  lkReactivePowerSlackUp(l,k)
+  jkReactivePowerGenSlackLo(j,k)
+  jkReactivePowerGenSlackUp(j,k)
+  jkVoltMagDevLo(j,k)
+  jkVoltMagDevUp(j,k)
+  jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
+  jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k);
 
 * technical variables
 variables
@@ -491,7 +511,8 @@ lkRealPowerRecoveryDef(l,k)$(lkActive(l,k) and not kBase(k))..
       lkRealPower(l,k)
   =e= sum(k0$kBase(k0),lkRealPower(l,k0))
    +  lParticipationFactor(l)*kRealPowerShortfall(k)
-   /  sum(l1$lkActive(l1,k),lParticipationFactor(l1));
+   /  sum(l1$lkActive(l1,k),lParticipationFactor(l1))
+;
 
 jkVoltageMagnitudeMaintenance(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
       jkVoltageMagnitude(j,k)
@@ -521,29 +542,169 @@ ikRealPowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
 ikReactivePowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
 $offtext
 
-* solve
-$ifthen %model%==pen
+*scaling
+pscopf_pen.scaleopt=0;
+jkVoltageMagnitudeViolationPos.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1;
+jkVoltageMagnitudeViolationNeg.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1;
+jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1e3;
+
+* solver options
+pscopf_pen.optfile=1;
+*pscopf_strict.optfile=1;
+$onecho > knitro.opt
+*bar_penaltycons 2
+*secret 1050 i 2
+feastol 1e-10
+opttol 1e-10
+*ms_enable 1
+$offecho
+
+* solve penalty formulation
 solve pscopf_pen using nlp minimizing obj;
 modelStatus = pscopf_pen.modelstat;
 solveStatus = pscopf_pen.solvestat;
-$endif
-$ifthen %model%==strict
-solve pscopf_strict using nlp minimizing cost;
-modelStatus = pscopf_strict.modelstat;
-solveStatus = pscopf_strict.solvestat;
-$endif
+*$exit
+
+* assess slacks and deviations
+lkReactivePowerSlackLo(l,k)$lkActive(l,k)
+  = max(0,lkReactivePower.l(l,k)-lReactivePowerMin(l));
+lkReactivePowerSlackUp(l,k)$lkActive(l,k)
+  = max(0,lReactivePowerMax(l)-lkReactivePower.l(l,k));
+jkReactivePowerGenSlackLo(j,k)
+  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackLo(l,k));
+jkReactivePowerGenSlackUp(j,k)
+  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackUp(l,k));
+jkVoltMagDevLo(j,k)
+  = max(0,sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1))-jkVoltageMagnitude.l(j,k))
+    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
+jkVoltMagDevUp(j,k)
+  = max(0,jkVoltageMagnitude.l(j,k)-sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1)))
+    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
+jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
+  = jkVoltMagDevLo(j,k)*jkReactivePowerGenSlackUp(j,k);
+jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k)
+  = jkVoltMagDevUp(j,k)*jkReactivePowerGenSlackLo(j,k);
+
+display
+  jkVoltMagDevLo
+  jkVoltMagDevUp;
+
+* set bounds to achieve complementarity based on current point
+* if v < v* and q = qmax then fix q = qmax
+* i.e. if vDevLo > qSlackUp then fix q = qmax
+*
+* if v > v* and q = qmin then fix q = qmin
+* i.e. if vDevUp > qSlackLo then fix q = qmin
+*
+* if qmin < q < qmax and v = v* then fix v = v*
+* i.e. if vDevLo <= qSlackUp and vDevUp <= qSlackDown then fix v = f*
+parameter
+  voltageMagnitudeDeviationTolerance /%voltage_tolerance%/;
+loop((j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0),
+$ontext
+  if(jkVoltMagDevLo(j,k) > jkReactivePowerGenSlackUp(j,k),
+    lkReactivePower.lo(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
+  );
+  if(jkVoltMagDevUp(j,k) > jkReactivePowerGenSlackLo(j,k),
+    lkReactivePower.up(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMin(l);
+  );
+  if(jkVoltMagDevLo(j,k) le jkReactivePowerGenSlackUp(j,k) and jkVoltMagDevUp(j,k) le jkReactivePowerGenSlackLo(j,k),
+    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
+    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
+  );
+$offtext
+  if(jkVoltMagDevLo(j,k) > voltageMagnitudeDeviationTolerance,
+    lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
+    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
+  elseif jkVoltMagDevUp(j,k) > voltageMagnitudeDeviationTolerance,
+    lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMin(l);
+    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
+  else
+    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
+    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
+  );
+);
+
+* experiment
+*lkReactivePower.up(l,k)$(lkActive(l,k) and lkReactivePower.l(l,k) = lReactivePowerMax(l)) = lReactivePowerMax(l);
+*lkReactivePower.lo(l,k)$(lkActive(l,k) and lkReactivePower.l(l,k) = lReactivePowerMin(l)) = lReactivePowerMin(l);
+*lkReactivePower.up(l,k)$(lkActive(l,k)) = 100;
+*lkReactivePower.lo(l,k)$(lkActive(l,k)) = -100;
+*lkReactivePower.up(l,k)$(lkActive(l,k)) = lReactivePowerMax(l) + abs(lReactivePowerMax(l));
+*lkReactivePower.lo(l,k)$(lkActive(l,k)) = lReactivePowerMin(l) - abs(lReactivePowerMin(l));
+
+* resolve
+*$ontext
+if(modelStatus = 2,
+penaltyCoeff = 0;
+*pscopf_pen.holdfixed = 1;
+solve pscopf_pen using nlp minimizing obj;
+modelStatus = pscopf_pen.modelstat;
+solveStatus = pscopf_pen.solvestat;
+);
+*$offtext
+
+* assess solution
+lkReactivePowerSlackLo(l,k)$lkActive(l,k)
+  = max(0,lkReactivePower.l(l,k)-lReactivePowerMin(l));
+lkReactivePowerSlackUp(l,k)$lkActive(l,k)
+  = max(0,lReactivePowerMax(l)-lkReactivePower.l(l,k));
+jkReactivePowerGenSlackLo(j,k)
+  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackLo(l,k));
+jkReactivePowerGenSlackUp(j,k)
+  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackUp(l,k));
+jkVoltMagDevLo(j,k)
+  =  max(0,sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1))-jkVoltageMagnitude.l(j,k))
+    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
+jkVoltMagDevUp(j,k)
+  = max(0,jkVoltageMagnitude.l(j,k)-sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1)))
+    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
+jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
+  = jkVoltMagDevLo(j,k)*jkReactivePowerGenSlackUp(j,k);
+jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k)
+  = jkVoltMagDevUp(j,k)*jkReactivePowerGenSlackLo(j,k);
 
 * translate back to data units
+lkReactivePowerSlackLo(l,k)$lkActive(l,k)
+  = baseMVA*lkReactivePowerSlackLo(l,k);
+lkReactivePowerSlackUp(l,k)$lkActive(l,k)
+  = baseMVA*lkReactivePowerSlackUp(l,k);
+jkReactivePowerGenSlackLo(j,k)
+  = baseMVA*jkReactivePowerGenSlackLo(j,k);
+jkReactivePowerGenSlackUp(j,k)
+  = baseMVA*jkReactivePowerGenSlackUp(j,k);
+*jkVoltMagDevLo(j,k)
+*jkVoltMagDevUp(j,k)
+jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
+  = baseMVA*jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k);
+jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k)
+  = baseMVA*jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k);
+iPowerMagnitudeMax(i) = baseMVA * iPowerMagnitudeMax(i);
+ikRealPowerOrigin.l(i,k)$ikActive(i,k) = baseMVA * ikRealPowerOrigin.l(i,k);
+ikReactivePowerOrigin.l(i,k)$ikActive(i,k) = baseMVA * ikReactivePowerOrigin.l(i,k);
+ikRealPowerDestination.l(i,k)$ikActive(i,k) = baseMVA * ikRealPowerDestination.l(i,k);
+ikReactivePowerDestination.l(i,k)$ikActive(i,k) = baseMVA * ikReactivePowerDestination.l(i,k);
+jkShuntRealPower.l(j,k) = baseMVA * jkShuntRealPower.l(j,k);
+jkShuntReactivePower.l(j,k) = baseMVA * jkShuntReactivePower.l(j,k);
+lRealPowerMin(l) = baseMVA * lRealPowerMin(l);
+lRealPowerMax(l) = baseMVA * lRealPowerMax(l);
+lReactivePowerMin(l) = baseMVA * lReactivePowerMin(l);
+lReactivePowerMax(l) = baseMVA * lReactivePowerMax(l);
 jRealPowerDemand(j) = baseMVA * jRealPowerDemand(j);
 jReactivePowerDemand(j) = baseMVA * jReactivePowerDemand(j);
 *jkVoltageMagnitude.l(j,k) = jBaseKV(j) * jkVoltageMagnitude.l(j,k);
 jkVoltageAngle.l(j,k) = 180 * jkVoltageAngle.l(j,k) / pi;
 lkRealPower.l(l,k)$lkActive(l,k) = baseMVA * lkRealPower.l(l,k);
 lkReactivePower.l(l,k)$lkActive(l,k) = baseMVA * lkReactivePower.l(l,k);
-kRealPowerShortfall.l(k) = baseMVA * kRealPowerShortfall.l(k);
+kRealPowerShortfall.l(k)
+  = baseMVA * kRealPowerShortfall.l(k)
+  / sum(l1$lkActive(l1,k),lParticipationFactor(l1));
 *kRealPowerShortfall.l(k) = 0;
 
 * output
-*$include pscopf_output_format0.gms
-*$include pscopf_output_format1.gms
+$set outputtype 0
+$include pscopf_write_solution.gms
+$set outputtype 1
+$include pscopf_write_solution.gms
+$set outputtype 2
 $include pscopf_write_solution.gms
