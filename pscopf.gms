@@ -1,32 +1,127 @@
 $title pscopf
 $ontext
-Preventive security-constrained optimal power flow
+PSCOPF: Preventive Security-Constrained Optimal Power Flow
 
-ACOPF model
-with (presumably convex) quadratic real power generation cost functions
+The model is an ACOPF with preventive security constraints
 
+Broadly the OPF (optimal power flow) model
+involves choosing real power output for a set of generators
+so as to meet specified real power demand.
+Generator cost functions specify the cost of each generator
+producing a given amount of real power.
+The objective of OPF is to minimize the total generation cost.
 
-polynomial and convex piecewise linear real power generation cost functions
-preventive security constraints based on prescribed reaction to contingencies
+The AC (alternating current) OPF model requires that power
+flow from generator buses to load buses through a network of buses,
+lines, transformers, and shunt elements according to a set of
+power flow equations.
+The power flow equations define constraints on the net injections
+of real and reactive power at each bus,
+the voltage magnitude and angle at each bus,
+and the real and reactive power flow along lines and transformers.
+Net injection is generation minus demand minus shunt consumption.
+Engineering bounds are placed on bus voltage magnitude,
+on power and current flows over lines and transformers,
+and on generator real and reactive power outputs.
 
-are other MVA and KV bases needed?
+Security constraints further constrain the generator real power
+outputs and other decision variables by requiring that under
+certain prespecified contingencies, the system will react in
+a way that continues to meet engineering limits.
+For example, one such contingency might be defined by the
+loss of a generator and all its power output.
+Another contingency might be defined by the loss
+of a line, in which case the power and current flow along that
+line is lost, and also the constraints defining those flows are
+removed.
 
-On processing into per unit, the solution with no security contingencies
-agrees exactly with the Matpower solution for case14.
-However, reading the psse version of case14 into matpower and translating it to
-a matpower case and using that to generate data for this model give a
-slightly different even if the cost data is taken from the original matpower case14.
-If the cost data is taken from our generator.csv file, the solution is radically
-different.
-The agreement with matpower on the original case14 suggests that at least the
-ACOPF model contained here, and all the per unit transformations, are correct.
+In the event of a security contingency,
+power injections and flows and bus voltages may change.
+The contingency flows and voltages are subject to all the
+original engineering bounds.
+Voltage magnitudes at buses containing generators are subject
+to further constraints under a contingency.
+Specifically, the voltage at any generator bus should
+remain the same under a contingency as the value assigned
+in the base case.
+In practice this constraint may be violated,
+but all generators at such a bus receive control signals from
+the bus voltage, and therefore they produce as much
+reactive power as possible as long as the bus voltage is too low,
+or conversely consume as much reactive power as possible
+as long as the bus voltage is too high.
+This generator behavior is known as PV/PQ switching since,
+while the bus voltage can be maintained, the bus is a PV bus,
+i.e. having fixed net real power (P) injection and fixed voltage
+magnitude (V), but if the bus voltage cannot be maintained,
+it becomes a PQ bus, i.e. with both fixed values of both
+real and reactive net power injection.
+This PV/PQ switching constraint on generator behavior is,
+algebraically, a pair of complementarity constraints:
 
-We need to map the matpower components and GAMS components to
-the original component identifiers (buses, branches, etc.)
+if V_i_k < V_i_k0 then Q_gen_g_k = Q_gen_max_g
+if V_i_k > V_i_k0 then Q_gen_g_k = Q_gen_min_g
 
-need to know:
-which buses are original, what are their identifiers?
-what are the generator identifiers?
+for all buses i, generators g at bus i, security contingencies k,
+
+where k0 represents the base case, and
+
+V_i_k = voltage magnitude at bus i in contingency k
+V_i_k0 = voltage magnitude at bus i in base case (k0)
+Q_gen_g_k = reactive power generation of generator g in contingency k
+Q_gen_max_g = maximum reactive power generation of generator g
+Q_gen_min_g = minimum reactive power generation of generator g
+
+The security concept modeled is preventive security,
+as opposed to corrective security,
+meaning that the actions that may be taken by generators
+and other controlled elements of the power system
+in order to meet the security constraints in the event of
+a security contingency are very limited.
+For our purposes,
+generator real power output can change only according to a prespecified
+participation factor. That is,
+
+P_gen_g_k = P_gen_g_k0 + alpha_g_k * P_delta_k
+
+for all contingencies k and all generators g active in scenario k
+
+where k0 represents the base case, and
+
+P_gen_g_k = real power output of generator g in contingency k
+P_gen_g_k0 = real power output of generator g in the base case (k0)
+alpha_g_k = participation factor for generator g in contingency k
+P_delta_k = total real power power output change by active generators in contingency k
+
+This GAMS code file (GMS) implements a method of solving
+the PSCOPF problem.
+All input data is described in sets and parameters.
+The algebraic model is specified by variables and constraints,
+with appropriate bounds on the variables.
+The AC power flow is modeled by representing bus voltage in
+polar form and power injections and flows in rectangular form.
+The model is a nonconvex nonlinear program (NLP).
+Specifically, no discrete variables are needed,
+but the AC power flow equations make the model nonconvex.
+The NLP solver Knitro is called to solve the model,
+but other solvers, such as IPOPT, would also be appropriate.
+
+Algebraically, the most challenging aspect of this model is the
+complementarity constraints enforcing the PV/PQ switching behavior.
+Other SCOPF implementations, both academic and commercial, have
+modeled these constraints in various ways. A few of these are:
+(1) smooth algebraic approximation of complementarity,
+(2) penalization of voltage deviation from base case to security contingency
+(3) fixing PV/PQ to one side of the complementarity or the other.
+These approaches may be used in succession.
+The model given here first uses method (2) to find an initial
+solution. This solution is used to select some bus voltage magnitude
+and reactive power output variables to fix for a second solve by method (3).
+This approach can fail. The second solve with method (3) may be infeasible
+even if the overall problem is feasible. The second solve can give
+a nonoptimal solution to the overall problem. The solution to the
+first solve may present an ambiguous choice of variables to fix for
+the second solve.
 $offtext
 
 * data gms file
@@ -36,32 +131,10 @@ $if not set ingdx $set ingdx pscopf_data.gdx
 $if not set voltage_penalty $set voltage_penalty 1000000
 $if not set voltage_tolerance $set voltage_tolerance 1e-6
 
-* model:
-* pen
-* strict
-$if not set model $set model pen
-
 * solution
 $if not set solutionname $set solutionname solution
 
-* for testing:
-$if not set do_infeas $set do_infeas 0
-$if not set do_bad_output $set do_bad_output 0
-$if not set do_compile_error $set do_compile_error 0
-$if not set do_exec_error $set do_exec_error 0
-
-$if not set int_max $set int_max 1000000
-
-$ifthen %do_compile_error%==1
-$abort 'added a compile error'
-$endif
-
-$ifthen %do_exec_error%==1
-abort 'added an execution error';
-$endif
-
 set baseCase /baseCase/;
-*set nonnegativeIntegers /0*%int_max%/;
 
 sets
   circuits c
@@ -150,6 +223,7 @@ parameters
   penaltyCoeff /%voltage_penalty%/
   lParticipationFactor(l);
 
+* load data from GDX input file
 $gdxin '%ingdx%'
 $loaddc circuits
 $loaddc branches
@@ -189,14 +263,6 @@ $loaddc lmRealPowerCostExponent
 $loaddc lParticipationFactor
 $gdxin
 
-* experiment
-iPowerMagnitudeMax(i) = 1.3*iPowerMagnitudeMax(i);
-*jRealPowerDemand(j) = 0.55*jRealPowerDemand(j);
-*jReactivePowerDemand(j) = 0.55*jReactivePowerDemand(j);
-
-*ikInactive(i,k) = no;
-*lkInactive(l,k) = no;
-
 * solution
 parameter
   modelStatus /0/
@@ -224,7 +290,7 @@ variables
   ikReactivePowerDestination(i,k) bus to branch
   kRealPowerShortfall(k) missing real power that must be made up by increased generation;
 
-* violation variables
+* violation variables for use in PV/PQ switching penalty approach
 positive variables
   jkVoltageMagnitudeViolationPos(j,k)
   jkVoltageMagnitudeViolationNeg(j,k);
@@ -260,26 +326,7 @@ equations
 
 * model
 model
-  pscopf_strict /
-    costDef
-    jkRealPowerBalance
-    jkReactivePowerBalance
-    ikPowerMagnitudeOriginBound
-    ikPowerMagnitudeDestinationBound
-    jkShuntRealPowerDef
-    jkShuntReactivePowerDef
-    ijjkRealPowerOriginDef
-    ijjkReactivePowerOriginDef
-    ijjkRealPowerDestinationDef
-    ijjkReactivePowerDestinationDef
-    ijjkVoltageMagnitudeSeriesImpedanceZeroEq
-    ijjkVoltageAngleSeriesImpedanceZeroEq
-    ikRealPowerSeriesImpedanceZeroEq
-    ijjkReactivePowerSeriesImpedanceZeroEq
-    lkRealPowerRecoveryDef
-    jkVoltageMagnitudeMaintenance
- /
-  pscopf_pen /
+  pscopf /
     objDef
     penaltyDef
     costDef
@@ -321,12 +368,12 @@ lReactivePowerMax(l) = lReactivePowerMax(l) / baseMVA;
 lmRealPowerCostCoefficient(l,m) = lmRealPowerCostCoefficient(l,m) * power(baseMVA,lmRealPowerCostExponent(l,m));
 *lmRealPowerCostExponent(l,m);
 
-* setup some sets
+* setup some utility sets
 ijjOriginDestination(i,j1,j2)$(ijOrigin(i,j1) and ijDestination(i,j2)) = yes;
 ikActive(i,k) = not ikInactive(i,k);
 lkActive(l,k) = not lkInactive(l,k);
 
-* data checks
+* data validity checks
 loop(i,
   if(sum(j$ijOrigin(i,j),1) > 1,
     abort 'branch with multiple origins';);
@@ -378,22 +425,6 @@ iSeriesConductance(i)$iSeriesImpedanceNonzero(i)
 iSeriesSusceptance(i)$iSeriesImpedanceNonzero(i)
   = -iSeriesReactance(i)
   / (sqr(iSeriesResistance(i)) + sqr(iSeriesReactance(i)));
-
-* make some mistakes
-*$ontext
-$ifthen %do_infeas%==1
-parameter infeasibilityScale / 0.01 /;
-jRealPowerDemand(j) = (1 + infeasibilityScale * normal(0,1)) * jRealPowerDemand(j);
-jReactivePowerDemand(j) = (1 + infeasibilityScale * normal(0,1)) * jReactivePowerDemand(j);
-jVoltageMagnitudeMin(j) = (1 - infeasibilityScale * sqr(normal(0,1))) * jVoltageMagnitudeMin(j);
-jVoltageMagnitudeMax(j) = (1 + infeasibilityScale * sqr(normal(0,1))) * jVoltageMagnitudeMax(j);
-lRealPowerMin(l) = (1 - infeasibilityScale * sqr(normal(0,1))) * lRealPowerMin(l);
-lRealPowerMax(l) = (1 + infeasibilityScale * sqr(normal(0,1))) * lRealPowerMax(l);
-lReactivePowerMin(l) = (1 - infeasibilityScale * sqr(normal(0,1))) * lReactivePowerMin(l);
-lReactivePowerMax(l) = (1 + infeasibilityScale * sqr(normal(0,1))) * lReactivePowerMax(l);
-iPowerMagnitudeMax(i) = (1 + infeasibilityScale * sqr(normal(0,1))) * iPowerMagnitudeMax(i);
-*$offtext
-$endif
 
 * bounds
 lkRealPower.lo(l,k)$lkActive(l,k) = lRealPowerMin(l);
@@ -524,9 +555,6 @@ jkVoltageMagnitudeMaintenanceViolationDef(j,k)$(not kBase(k) and sum(l$(lkActive
   =e= jkVoltageMagnitudeViolationPos(j,k)
    -  jkVoltageMagnitudeViolationNeg(j,k);
 
-*lkActive(l,k) = lkActive(l,k) and (ord(k) = 1);
-*ikActive(i,k) = ikActive(i,k) and (ord(k) = 1);
-
 * set a start point
 $ontext
 * random start point
@@ -543,27 +571,22 @@ ikReactivePowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
 $offtext
 
 *scaling
-pscopf_pen.scaleopt=0;
+pscopf.scaleopt=0;
 jkVoltageMagnitudeViolationPos.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1;
 jkVoltageMagnitudeViolationNeg.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1;
 jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1e3;
 
 * solver options
-pscopf_pen.optfile=1;
-*pscopf_strict.optfile=1;
+pscopf.optfile=1;
 $onecho > knitro.opt
-*bar_penaltycons 2
-*secret 1050 i 2
-feastol 1e-10
-opttol 1e-10
-*ms_enable 1
+*feastol 1e-10
+*opttol 1e-10
 $offecho
 
 * solve penalty formulation
-solve pscopf_pen using nlp minimizing obj;
-modelStatus = pscopf_pen.modelstat;
-solveStatus = pscopf_pen.solvestat;
-*$exit
+solve pscopf using nlp minimizing obj;
+modelStatus = pscopf.modelstat;
+solveStatus = pscopf.solvestat;
 
 * assess slacks and deviations
 lkReactivePowerSlackLo(l,k)$lkActive(l,k)
@@ -625,22 +648,14 @@ $offtext
   );
 );
 
-* experiment
-*lkReactivePower.up(l,k)$(lkActive(l,k) and lkReactivePower.l(l,k) = lReactivePowerMax(l)) = lReactivePowerMax(l);
-*lkReactivePower.lo(l,k)$(lkActive(l,k) and lkReactivePower.l(l,k) = lReactivePowerMin(l)) = lReactivePowerMin(l);
-*lkReactivePower.up(l,k)$(lkActive(l,k)) = 100;
-*lkReactivePower.lo(l,k)$(lkActive(l,k)) = -100;
-*lkReactivePower.up(l,k)$(lkActive(l,k)) = lReactivePowerMax(l) + abs(lReactivePowerMax(l));
-*lkReactivePower.lo(l,k)$(lkActive(l,k)) = lReactivePowerMin(l) - abs(lReactivePowerMin(l));
-
-* resolve
+* resolve with fixed complementarity and no penalties
 *$ontext
 if(modelStatus = 2,
 penaltyCoeff = 0;
-*pscopf_pen.holdfixed = 1;
-solve pscopf_pen using nlp minimizing obj;
-modelStatus = pscopf_pen.modelstat;
-solveStatus = pscopf_pen.solvestat;
+*pscopf.holdfixed = 1;
+solve pscopf using nlp minimizing obj;
+modelStatus = pscopf.modelstat;
+solveStatus = pscopf.solvestat;
 );
 *$offtext
 

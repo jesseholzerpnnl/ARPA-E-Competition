@@ -16,7 +16,7 @@ or
 
 $offtext
 
-$if not set case $abort 'usage: gams MyGams.gms --case="case_file_name.gms"'
+$if not set case $abort 'usage: gams MyGams1.gms --case="case_file_name.gms"'
 
 * for testing:
 $if not set do_infeas $set do_infeas 0
@@ -33,4 +33,4 @@ $if not exist pscopf.gms $abort 'missing file "pscopf.gms"'
 *$if not exist pscopf_output_format1.gms $abort 'missing file "pscopf_output_format1.gms"'
 $if not exist pscopf_write_solution.gms $abort 'missing file "pscopf_write_solution.gms"'
 
-$call 'gams pscopf_run.gms --ingms=%case% --nlp=knitro --do_infeas=%do_infeas% --do_bad_output=%do_bad_output% --do_compile_error=%do_compile_error% --do_exec_error=%do_exec_error%'
+$call 'gams pscopf_run.gms --ingms=%case% --soltxt=solution1.txt --nlp=knitro --do_infeas=%do_infeas% --do_bad_output=%do_bad_output% --do_compile_error=%do_compile_error% --do_exec_error=%do_exec_error%'

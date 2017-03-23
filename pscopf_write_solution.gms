@@ -61,19 +61,46 @@ put '--end of generation dispatch' /;
 $endif
 
 $ifthen %outputtype%==2
-put '--pqvo' /;
-put 'contingency id,bus id,p(MW),q(MVar),v(pu),theta(deg)' /;
+put '--contingency generator' /;
+put
+  'conID,'
+  'genID,'
+  'busID,'
+  'unitID,'
+  'q(MW)' /;
+loop(k$(not kBase(k)),
+  loop((l,j,u)$(lkActive(l,k) and ljMap(l,j) and luMap(l,u)),
+    put
+      k.tl:0 ','
+      l.tl:0 ','
+      j.tl:0 ','
+      u.tl:0 ','
+      lkReactivePower.l(l,k):0:10 /;
+  );
+);
+put '--end of contingency generator' /;
+$endif
+
+$ifthen %outputtype%==2
+put '--bus' /;
+put 'contingency id,bus id,v(pu),theta(deg)' /;
 loop(kBase(k),
   loop(j,
-    put '0,' j.tl:0 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkRealPower.l(l,k)) - jRealPowerDemand(j)):0:10 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePower.l(l,k)) - jReactivePowerDemand(j)):0:10 ',' jkVoltageMagnitude.l(j,k):0:10 ',' jkVoltageAngle.l(j,k):0:10 /;
+    put '0,'
+    j.tl:0 ','
+    jkVoltageMagnitude.l(j,k):0:10 ','
+    jkVoltageAngle.l(j,k):0:10 /;
   );
 );
 loop(k$(not kBase(k)),
   loop(j,
-    put k.tl:0 ',' j.tl:0 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkRealPower.l(l,k)) - jRealPowerDemand(j)):0:10 ',' (sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePower.l(l,k)) - jReactivePowerDemand(j)):0:10 ',' jkVoltageMagnitude.l(j,k):0:10 ',' jkVoltageAngle.l(j,k):0:10 /;
+    put k.tl:0 ','
+    j.tl:0 ','
+    jkVoltageMagnitude.l(j,k):0:10 ','
+    jkVoltageAngle.l(j,k):0:10 /;
   );
 );
-put '--end of pqvo' /;
+put '--end of bus' /;
 $endif
 
 $ifthen %outputtype%==2
@@ -214,7 +241,7 @@ loop(k$kBase(k),
   );
 );
 put '--end of base branch' /;
-put '--contingency' /;
+put '--contingency delta' /;
 put
   'conID,'
   'pRedispatch(MW)' /;
