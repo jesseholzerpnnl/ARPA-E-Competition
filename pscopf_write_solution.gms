@@ -33,13 +33,6 @@ file outputfile%outputtype% /'%soltxt%'/;
 
 put outputfile%outputtype%;
 
-$ifthen %outputtype%==1
-put '--performance' /;
-put 'time(s),objective value(dol)' /;
-put timeelapsed:0:10 ',' cost.l:0:10 /;
-put '--end of performance' /;
-$endif
-
 $ifthen %do_bad_output%==1
 put '--generation dispatch' /;
 put 'bus id,unit id,pg(MW),qg(MVar)' /;
