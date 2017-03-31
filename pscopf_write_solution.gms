@@ -26,6 +26,9 @@ $if not set outputtype $set outputtype 0
 $if not set solutionname $set solutionname solution
 
 $set soltxt %solutionname%%outputtype%.txt
+
+$include pscopf_process_solution.gms
+
 file outputfile%outputtype% /'%soltxt%'/;
 *outputfile.nw = 0;
 *outputfile.nr = 3;
@@ -126,11 +129,13 @@ put '--summary' /;
 put
   'time(s),'
   'cost(dol),'
+  'constrViolMax,'
   'solveStat,'
   'modelStat' /;
 put
   timeelapsed:0:10 ','
   cost.l:0:10 ','
+  constrViolMax:0:10 ','
   solveStatus:0:0 ','
   modelStatus:0:0 /;
 put '--end of summary' /;

@@ -1,5 +1,10 @@
-$title pscopf
+$title pscopf_comp
 $ontext
+PSCOPF_COMP: formulate PV/PQ switching using the complementarity
+feature of GAMS
+
+
+
 PSCOPF: Preventive Security-Constrained Optimal Power Flow
 
 The model is an ACOPF with preventive security constraints
@@ -128,7 +133,6 @@ $offtext
 $if not set ingdx $set ingdx pscopf_data.gdx
 
 * voltage magnitude deviation penalty
-$if not set voltage_penalty $set voltage_penalty 1000000
 $if not set voltage_tolerance $set voltage_tolerance 1e-6
 
 * solution
@@ -220,7 +224,6 @@ parameters
 
 * contingency modeling parameters
 parameters
-  penaltyCoeff /%voltage_penalty%/
   lParticipationFactor(l);
 
 * load data from GDX input file
@@ -290,21 +293,21 @@ variables
   ikReactivePowerDestination(i,k) bus to branch
   kRealPowerShortfall(k) missing real power that must be made up by increased generation;
 
-* violation variables for use in PV/PQ switching penalty approach
+* bus voltage violation variables for use in PV/PQ switching
 positive variables
   jkVoltageMagnitudeViolationPos(j,k)
-  jkVoltageMagnitudeViolationNeg(j,k);
+  jkVoltageMagnitudeViolationNeg(j,k)
+
+* bus reactive power variables for use in PV/PQ switching
+free variables
+  jkReactivePower(j,k);
 
 * cost variables
 variables
-  obj
-  penalty
   cost;
 
 * equations
 equations
-  objDef
-  penaltyDef
   costDef
   jkRealPowerBalance(j,k)
   jkReactivePowerBalance(j,k)
@@ -322,13 +325,14 @@ equations
   ijjkReactivePowerSeriesImpedanceZeroEq(i,j1,j2,k)
   lkRealPowerRecoveryDef(l,k)
   jkVoltageMagnitudeMaintenance(j,k)
-  jkVoltageMagnitudeMaintenanceViolationDef(j,k);
+  jkVoltageMagnitudeMaintenanceViolationDef(j,k)
+  jkReactivePowerDef(j,k)
+  jkReactivePowerUpEq(j,k)
+  jkReactivePowerLoEq(j,k);
 
 * model
 model
   pscopf /
-    objDef
-    penaltyDef
     costDef
     jkRealPowerBalance
     jkReactivePowerBalance
@@ -346,6 +350,9 @@ model
     ijjkReactivePowerSeriesImpedanceZeroEq
     lkRealPowerRecoveryDef
     jkVoltageMagnitudeMaintenanceViolationDef
+    jkReactivePowerDef
+    jkReactivePowerUpEq.jkVoltageMagnitudeViolationNeg
+    jkReactivePowerLoEq.jkVoltageMagnitudeViolationPos
 /;
 
 * process into per unit for optimization model
@@ -411,8 +418,6 @@ loop(k$(not kBase(k)),
     abort 'contingency with no active participating generators';);
 );
 
-*lParticipationFactor(l) = lParticipationFactor(l) / sum(l0,lParticipationFactor(l0));
-
 * compute line parameters
 iSeriesImpedanceNonzero(i) = (
   abs(iSeriesResistance(i)) gt 0 or
@@ -435,19 +440,6 @@ lkReactivePower.up(l,k)$lkActive(l,k) = lReactivePowerMax(l);
 jkVoltageMagnitude.up(j,k) = jVoltageMagnitudeMax(j);
 
 * equation definitions
-
-* general objective
-objDef..
-      obj
-  =e= cost
-   +  penaltyCoeff * penalty;
-
-* penalty
-penaltyDef..
-      penalty
-  =e= sum((j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)),
-          jkVoltageMagnitudeViolationPos(j,k)
-        + jkVoltageMagnitudeViolationNeg(j,k));
 
 * generation cost
 costDef..
@@ -555,6 +547,20 @@ jkVoltageMagnitudeMaintenanceViolationDef(j,k)$(not kBase(k) and sum(l$(lkActive
   =e= jkVoltageMagnitudeViolationPos(j,k)
    -  jkVoltageMagnitudeViolationNeg(j,k);
 
+jkReactivePowerDef(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+      jkReactivePower(j,k)
+  =e= sum(l$(lkActive(l,k) and ljMap(l,j)), lkReactivePower(l,k));
+
+jkReactivePowerUpEq(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+      sum(l$(lkActive(l,k) and ljMap(l,j)), lReactivePowerMax(l))
+   -  jkReactivePower(j,k)
+  =g= 0;
+  
+jkReactivePowerLoEq(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+      jkReactivePower(j,k)
+   -  sum(l$(lkActive(l,k) and ljMap(l,j)), lReactivePowerMin(l))
+  =g= 0;
+
 * set a start point
 $ontext
 * random start point
@@ -579,89 +585,20 @@ jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lk
 * solver options
 pscopf.optfile=1;
 $onecho > knitro.opt
-feastol 1e-8
+feastol 1e-5
 opttol 1e-4
-maxcgit 10
 ftol 1e-4
 ftol_iters 3
+pivot 1e-12
+maxcgit 10
 maxtime_real 60
 $offecho
 
 * solve penalty formulation
-solve pscopf using nlp minimizing obj;
+option mpec = knitro;
+solve pscopf using mpec minimizing cost;
 modelStatus = pscopf.modelstat;
 solveStatus = pscopf.solvestat;
-
-* assess slacks and deviations
-lkReactivePowerSlackLo(l,k)$lkActive(l,k)
-  = max(0,lkReactivePower.l(l,k)-lReactivePowerMin(l));
-lkReactivePowerSlackUp(l,k)$lkActive(l,k)
-  = max(0,lReactivePowerMax(l)-lkReactivePower.l(l,k));
-jkReactivePowerGenSlackLo(j,k)
-  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackLo(l,k));
-jkReactivePowerGenSlackUp(j,k)
-  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackUp(l,k));
-jkVoltMagDevLo(j,k)
-  = max(0,sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1))-jkVoltageMagnitude.l(j,k))
-    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
-jkVoltMagDevUp(j,k)
-  = max(0,jkVoltageMagnitude.l(j,k)-sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1)))
-    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
-jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
-  = jkVoltMagDevLo(j,k)*jkReactivePowerGenSlackUp(j,k);
-jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k)
-  = jkVoltMagDevUp(j,k)*jkReactivePowerGenSlackLo(j,k);
-
-display
-  jkVoltMagDevLo
-  jkVoltMagDevUp;
-
-* set bounds to achieve complementarity based on current point
-* if v < v* and q = qmax then fix q = qmax
-* i.e. if vDevLo > qSlackUp then fix q = qmax
-*
-* if v > v* and q = qmin then fix q = qmin
-* i.e. if vDevUp > qSlackLo then fix q = qmin
-*
-* if qmin < q < qmax and v = v* then fix v = v*
-* i.e. if vDevLo <= qSlackUp and vDevUp <= qSlackDown then fix v = f*
-parameter
-  voltageMagnitudeDeviationTolerance /%voltage_tolerance%/;
-loop((j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0),
-$ontext
-  if(jkVoltMagDevLo(j,k) > jkReactivePowerGenSlackUp(j,k),
-    lkReactivePower.lo(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
-  );
-  if(jkVoltMagDevUp(j,k) > jkReactivePowerGenSlackLo(j,k),
-    lkReactivePower.up(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMin(l);
-  );
-  if(jkVoltMagDevLo(j,k) le jkReactivePowerGenSlackUp(j,k) and jkVoltMagDevUp(j,k) le jkReactivePowerGenSlackLo(j,k),
-    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
-    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
-  );
-$offtext
-  if(jkVoltMagDevLo(j,k) > voltageMagnitudeDeviationTolerance,
-    lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
-    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
-  elseif jkVoltMagDevUp(j,k) > voltageMagnitudeDeviationTolerance,
-    lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMin(l);
-    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
-  else
-    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
-    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
-  );
-);
-
-* resolve with fixed complementarity and no penalties
-*$ontext
-if(modelStatus = 2,
-penaltyCoeff = 0;
-*pscopf.holdfixed = 1;
-solve pscopf using nlp minimizing obj;
-modelStatus = pscopf.modelstat;
-solveStatus = pscopf.solvestat;
-);
-*$offtext
 
 * assess solution
 lkReactivePowerSlackLo(l,k)$lkActive(l,k)
