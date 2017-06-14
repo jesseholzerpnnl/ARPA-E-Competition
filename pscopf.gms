@@ -581,7 +581,7 @@ jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lk
 option nlp=examiner;
 
 $onecho > knitro.opt
-feastol 1e-10
+feastol 1e-8
 *feastol_abs 1e-2
 opttol 1e-4
 maxcgit 10
