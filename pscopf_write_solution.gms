@@ -11,6 +11,8 @@ modelStatus
 2 - locally optimal
 3 - unbounded
 5 - locally infeasible
+6 - intermediate infeasible
+7 - intermediate nonoptimal
 $offtext
 
 $if not set do_bad_output $set do_bad_output 0

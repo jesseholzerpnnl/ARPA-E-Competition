@@ -577,15 +577,29 @@ jkVoltageMagnitudeViolationNeg.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k)
 jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1e3;
 
 * solver options
-pscopf.optfile=1;
+
+option nlp=examiner;
+
 $onecho > knitro.opt
-feastol 1e-8
+feastol 1e-10
+*feastol_abs 1e-2
 opttol 1e-4
 maxcgit 10
 ftol 1e-4
 ftol_iters 3
-maxtime_real 60
+maxtime_real 300
 $offecho
+
+$onecho > examiner.opt
+examinesolupoint 1
+examinesolvpoint 1
+examinegamspoint 0
+examineinitpoint 0
+subsolver knitro.1
+$offecho
+
+pscopf.optfile=1;
+pscopf.tolproj=1e-12;
 
 * solve penalty formulation
 solve pscopf using nlp minimizing obj;
@@ -640,6 +654,7 @@ $ontext
     jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
   );
 $offtext
+*$ontext
   if(jkVoltMagDevLo(j,k) > voltageMagnitudeDeviationTolerance,
     lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
     jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
@@ -650,18 +665,43 @@ $offtext
     jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
     jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
   );
+*$offtext
 );
 
 * resolve with fixed complementarity and no penalties
 *$ontext
 if(modelStatus = 2,
 penaltyCoeff = 0;
-*pscopf.holdfixed = 1;
+pscopf.holdfixed = 1;
 solve pscopf using nlp minimizing obj;
 modelStatus = pscopf.modelstat;
 solveStatus = pscopf.solvestat;
 );
 *$offtext
+
+* resolve with fixed variables
+$ontext
+jkVoltageAngle.fx(j,k)$(sum(l$(ljMap(l,j) and lkActive(l,k)),lRealPowerMax(l) - lRealPowerMin(l)) > 0) = jkVoltageAngle.l(j,k);
+jkVoltageMagnitude.fx(j,k)$(sum(l$(ljMap(l,j) and lkActive(l,k)),lReactivePowerMax(l) - lReactivePowerMin(l)) > 0) = jkVoltageMagnitude.l(j,k);
+solve pscopf using nlp minimizing obj;
+modelStatus = pscopf.modelstat;
+solveStatus = pscopf.solvestat;
+$offtext
+
+*$ontext
+$onecho > examiner.op2
+examineGamsPoint 1
+examineInitPoint 0
+returnGamsPoint 1
+$offecho
+* further solve with GAMS examiner
+option nlp = examiner;
+pscopf.optfile = 2;
+solve pscopf using nlp minimizing obj;
+*$offtext
+
+* compute solution from variable values
+$include pscopf_compute_solution.gms
 
 * assess solution
 lkReactivePowerSlackLo(l,k)$lkActive(l,k)
