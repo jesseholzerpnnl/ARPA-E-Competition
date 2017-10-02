@@ -1,173 +1,5 @@
-$title pscopf_smooth
+$title pscopf
 $ontext
-PSCOPF-Smooth: Smooth approximate complementarity formulation
-of PV/PQ switching
-
-The intuitive idea of PV/PQ switching is:
-Increasing the generation of reactive power at a bus
-tends to increase the voltage magnitude at that bus.
-Consider a generator bus, i.e. a bus with a generator
-having the ability to vary its reactive power output
-within distinct bounds, possibly dependent on real power
-output. If the bus voltage drops below its set point,
-then the generator will react by increasing its reactive
-power output, until either the voltage set point is
-met or the reactive power upper bound is met. In
-equilibrium, it is not possible to have both voltage
-shortfall and reactive power generation upper slack.
-In other words,
-
-  if V < V_set then Q_gen = Q_gen_max                        (1)
-
-A similar complementarity holds between overvoltage
-and reactive power generation lower slack, i.e.
-
-  if V > V_set then Q_gen = Q_gen_min                        (2)
-
-These complementarity conditions are in addition to the
-general bounds on voltage magnitude and reactive power
-generation:
-
-  V_min <= V <= V_max
-  Q_gen_min <= Q_gen <= Q_gen_max
-
-In the more complicated situation where reactive power
-generation bounds depend on real power generation, we
-have
-
-  if V < V_set then Q_gen = Q_gen_max(P_gen)
-  if V > V_set then Q_gen = Q_gen_min(P_gen)
-
-One interesting feature of these complementarity constraints
-is the way that they change the feasible set of the problem.
-Without the complementarity constraints, increasing Q_gen_max
-or decreasing Q_gen_min constitutes a relaxation of the problem,
-obviously. With the complementarity constraints, this change to
-the problem data is not a relaxation.
-
-Assuming that the complemetarity constraints (1,2) are the
-correct model, several questions arise:
-
-1. If a competitor submits a solution with V, Q_gen violating
-(1) or (2), how should the constraint violation be
-defined? E.g. in (1), we could define the constraint violation
-to be, say,
-
-  min(max(0, V_set - V), Q_gen_max - Q_gen)
-
-or
-
-  max(0, V_set - V) * (Q_gen_max - Q_gen)
-
-Or we could modify the competitor's value of Q_gen in
-accordance with (1,2), by (in pseudo-python):
-
-  if V < V_set:                                                     (*)
-    Q_gen = Q_gen_max
-  elif V > V_set:
-    Q_gen = Q_gen_min
-
-Then this modified value of Q_gen would be carried forward into the
-power balance constraint evaluations. The answer to this
-question should be covered by a complete specification of
-what values are to be provided by the competitor and what
-values are computed by the evaluation procedure.
-
-2. How should our benchmark algorithms treat this complementarity?
-Several options can be found in the academic literature on
-mathematical programs with complementarity constraints (MPCC,
-MPEC, NLPCC, NLPEC, etc), in the documentation of algebraic
-modeling languages supporting complementarity constraints
-(GAMS, AMPL, etc.), and in the documentation of power systems
-analysis software (PSSE/OPF). These approaches include:
-
-a. procedural. Solve multiple subproblems, e.g. a first subproblem
-with a high penalty on deviations from V_set, then a heuristic
-to determine which buses should be fixed to V_set, which should
-be fixed to Q_gen_max, and which should be fixed to Q_gen_min,
-then a second subproblem with these variables fixed and no voltage
-penalties. This is a heuristic and can easily fail to obtain a
-global solution or fail to obtain any solution even if one exists.
-
-b. Exact algebraic. reformulate the complementarity constraints
-algebraically, and solve as an NLP. E.g. the complementarity
-constraint
-
-  0 <= x . y >= 0,                                               (3)
-
-meaning
-
-  0 <= x, 0 <= y, x = 0 or y = 0
-
-can be formulated algebraically as
-
-  0 <= x, 0 <= y, x*y <= 0
-
-Several other formulations are possible, notably
-
-  0 <= x, 0 <= y, x + y <= sqrt(x^2 + y^2)
-
-These formulations are prone to computational difficulty,
-lacking, e.g. a constraint qualification or smoothness
-at the point (x,y) = (0,0)
-
-c. Approximate algebraic. Use an algebraic formulation whose
-feasible set is approximately that of the complementarity
-constraints. In exchange for approximation these formulations
-yield computational benefits. E.g. One can take
-
-  0 <= x, 0 <= y, x*y <= c
-
-or
-
-  0 <= x, 0 <= y, x + y <= sqrt(c + x^2 + y^2)
-
-for a parameter c > 0. A natural question that arises in this
-approach is, What convergence properties hold as c -> 0?
-
-d. some combination. E.g. solve the model with an algebraic
-approximation, then use a predefined rule, such as (*), to
-modify the solution so as to ensure that complementarity holds,
-then further modifying the solution so as to resolve any ensuing
-infeasibility as much as possible.
-
-Our case is more directly analogous to
-
-  -1 <= y <= 1, if x > 0 then y = -1, if x < 0 then y = 1          (**)
-
-Specifically, we have (**) with x = V - V_set and
-y = 2 * (Q_gen - 0.5 * Q_gen_min - 0.5 * Q_gen_max) / (Q_gen_max - Q_gen_min)
-
-There are many classes of algebraic function f so that the
-graph of y = f(x) is approximately equal to the feasible set
-of (**). Then the graph of y = f(x/c) converges to (**) in
-some sense as c -> 0. E.g.
-
-  f(x) = -2 * arctan(x)
-
-A large family of these functions can be constructed from definite
-integrals of functions resembling the normal probability distribution
-function (including the example above). Some of these are not
-strictly algebraic (rather they are transcendental), but they
-are still available in algebraic modeling languages.
-
-Since this approximation y = f(x/c) gives y as an explicit
-function of x, or, in our case, Q_gen as an explicit function
-of V, we could even use this formulation in the description of
-the problem. That is, we could say that the model we want
-competitors to solve actually assumes that Q_gen is a smooth
-function of V, rather than a discontinuous step function.
-This would probably make the problem easier to solve and might
-be more realistic anyway. It does though raise the question of
-what value of c and what basic function f should be used.
-
-In this model we will still assume that the problem to be solved
-is the exact complementarity, but we will solve a single algebraic
-model based on an approximation with an explicit funtion using
-a particular choice of f and c. Complementarity violation will
-be evaluated using the product function. Reactive power generation
-will not be modified after the solve.
-
 PSCOPF: Preventive Security-Constrained Optimal Power Flow
 
 The model is an ACOPF with preventive security constraints
@@ -299,11 +131,20 @@ $if not set ingdx $set ingdx pscopf_data.gdx
 $if not set voltage_penalty $set voltage_penalty 1000000
 $if not set voltage_tolerance $set voltage_tolerance 1e-6
 
-* complementarity
-$if not set complementarity_parameter $set complementarity_parameter 1e-3
-
 * solution
 $if not set solutionname $set solutionname solution
+
+* for testing:
+$if not set do_infeas $set do_infeas 0
+$if not set do_bad_output $set do_bad_output 0
+$if not set do_compile_error $set do_compile_error 0
+$if not set do_exec_error $set do_exec_error 0
+$ifthen %do_compile_error%==1
+$abort 'added a compile error'
+$endif
+$ifthen %do_exec_error%==1
+abort 'added an execution error';
+$endif
 
 set baseCase /baseCase/;
 
@@ -392,7 +233,6 @@ parameters
 * contingency modeling parameters
 parameters
   penaltyCoeff /%voltage_penalty%/
-  complementarityParameter /%complementarity_parameter%/
   lParticipationFactor(l);
 
 * load data from GDX input file
@@ -462,14 +302,21 @@ variables
   ikReactivePowerDestination(i,k) bus to branch
   kRealPowerShortfall(k) missing real power that must be made up by increased generation;
 
+* violation variables for use in PV/PQ switching penalty approach
+positive variables
+  jkVoltageMagnitudeViolationPos(j,k)
+  jkVoltageMagnitudeViolationNeg(j,k);
+
 * cost variables
 variables
   obj
+  penalty
   cost;
 
 * equations
 equations
   objDef
+  penaltyDef
   costDef
   jkRealPowerBalance(j,k)
   jkReactivePowerBalance(j,k)
@@ -486,12 +333,14 @@ equations
   ikRealPowerSeriesImpedanceZeroEq(i,k)
   ijjkReactivePowerSeriesImpedanceZeroEq(i,j1,j2,k)
   lkRealPowerRecoveryDef(l,k)
-  lkReactivePowerDef(l,k);
+  jkVoltageMagnitudeMaintenance(j,k)
+  jkVoltageMagnitudeMaintenanceViolationDef(j,k);
 
 * model
 model
   pscopf /
     objDef
+    penaltyDef
     costDef
     jkRealPowerBalance
     jkReactivePowerBalance
@@ -508,7 +357,7 @@ model
     ikRealPowerSeriesImpedanceZeroEq
     ijjkReactivePowerSeriesImpedanceZeroEq
     lkRealPowerRecoveryDef
-    lkReactivePowerDef
+    jkVoltageMagnitudeMaintenanceViolationDef
 /;
 
 * process into per unit for optimization model
@@ -589,6 +438,23 @@ iSeriesSusceptance(i)$iSeriesImpedanceNonzero(i)
   = -iSeriesReactance(i)
   / (sqr(iSeriesResistance(i)) + sqr(iSeriesReactance(i)));
 
+* for testing
+* make some mistakes
+*$ontext
+$ifthen %do_infeas%==1
+parameter infeasibilityScale / 0.01 /;
+jRealPowerDemand(j) = (1 + infeasibilityScale * normal(0,1)) * jRealPowerDemand(j);
+jReactivePowerDemand(j) = (1 + infeasibilityScale * normal(0,1)) * jReactivePowerDemand(j);
+jVoltageMagnitudeMin(j) = (1 - infeasibilityScale * sqr(normal(0,1))) * jVoltageMagnitudeMin(j);
+jVoltageMagnitudeMax(j) = (1 + infeasibilityScale * sqr(normal(0,1))) * jVoltageMagnitudeMax(j);
+lRealPowerMin(l) = (1 - infeasibilityScale * sqr(normal(0,1))) * lRealPowerMin(l);
+lRealPowerMax(l) = (1 + infeasibilityScale * sqr(normal(0,1))) * lRealPowerMax(l);
+lReactivePowerMin(l) = (1 - infeasibilityScale * sqr(normal(0,1))) * lReactivePowerMin(l);
+lReactivePowerMax(l) = (1 + infeasibilityScale * sqr(normal(0,1))) * lReactivePowerMax(l);
+iPowerMagnitudeMax(i) = (1 + infeasibilityScale * sqr(normal(0,1))) * iPowerMagnitudeMax(i);
+*$offtext
+$endif
+
 * bounds
 lkRealPower.lo(l,k)$lkActive(l,k) = lRealPowerMin(l);
 lkReactivePower.lo(l,k)$lkActive(l,k) = lReactivePowerMin(l);
@@ -602,7 +468,15 @@ jkVoltageMagnitude.up(j,k) = jVoltageMagnitudeMax(j);
 * general objective
 objDef..
       obj
-  =e= cost;
+  =e= cost
+   +  penaltyCoeff * penalty;
+
+* penalty
+penaltyDef..
+      penalty
+  =e= sum((j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)),
+          jkVoltageMagnitudeViolationPos(j,k)
+        + jkVoltageMagnitudeViolationNeg(j,k));
 
 * generation cost
 costDef..
@@ -700,16 +574,15 @@ lkRealPowerRecoveryDef(l,k)$(lkActive(l,k) and not kBase(k))..
    /  sum(l1$lkActive(l1,k),lParticipationFactor(l1))
 ;
 
-lkReactivePowerDef(l,k)$(not kBase(k) and lkActive(l,k) and lReactivePowerMin(l) < lReactivePowerMax(l))..
-      (  2 * lkReactivePower(l,k)
-       -     lReactivePowerMin(l)
-       -     lReactivePowerMax(l)) /
-      (      lReactivePowerMax(l)
-       -     lReactivePowerMin(l))
-  =e= -(2/pi) * arctan(sum(j$ljMap(l,j),
-                       (  jkVoltageMagnitude(j,k)
-		        - sum(k0$kBase(k0),jkVoltageMagnitude(j,k0))) /
-		       complementarityParameter));
+jkVoltageMagnitudeMaintenance(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+      jkVoltageMagnitude(j,k)
+  =e= sum(k0$kBase(k0),jkVoltageMagnitude(j,k0));
+
+jkVoltageMagnitudeMaintenanceViolationDef(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1))..
+      jkVoltageMagnitude(j,k)
+   -  sum(k0$kBase(k0),jkVoltageMagnitude(j,k0))
+  =e= jkVoltageMagnitudeViolationPos(j,k)
+   -  jkVoltageMagnitudeViolationNeg(j,k);
 
 * set a start point
 $ontext
@@ -726,15 +599,17 @@ ikRealPowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
 ikReactivePowerDestination.l(i,k)$ikActive(i,k) = normal(0,1);
 $offtext
 
+*scaling
+pscopf.scaleopt=0;
+jkVoltageMagnitudeViolationPos.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1;
+jkVoltageMagnitudeViolationNeg.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1;
+jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1)) = 1e3;
+
 * solver options
 pscopf.optfile=1;
 $onecho > knitro.opt
-feastol 1e-8
-opttol 1e-4
-maxcgit 10
-ftol 1e-4
-ftol_iters 3
-maxtime_real 60
+feastol 1e-10
+opttol 1e-10
 $offecho
 
 * solve penalty formulation
@@ -765,6 +640,73 @@ jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k)
 display
   jkVoltMagDevLo
   jkVoltMagDevUp;
+
+* set bounds to achieve complementarity based on current point
+* if v < v* and q = qmax then fix q = qmax
+* i.e. if vDevLo > qSlackUp then fix q = qmax
+*
+* if v > v* and q = qmin then fix q = qmin
+* i.e. if vDevUp > qSlackLo then fix q = qmin
+*
+* if qmin < q < qmax and v = v* then fix v = v*
+* i.e. if vDevLo <= qSlackUp and vDevUp <= qSlackDown then fix v = f*
+parameter
+  voltageMagnitudeDeviationTolerance /%voltage_tolerance%/;
+loop((j,k)$(not kBase(k) and sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0),
+$ontext
+  if(jkVoltMagDevLo(j,k) > jkReactivePowerGenSlackUp(j,k),
+    lkReactivePower.lo(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
+  );
+  if(jkVoltMagDevUp(j,k) > jkReactivePowerGenSlackLo(j,k),
+    lkReactivePower.up(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMin(l);
+  );
+  if(jkVoltMagDevLo(j,k) le jkReactivePowerGenSlackUp(j,k) and jkVoltMagDevUp(j,k) le jkReactivePowerGenSlackLo(j,k),
+    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
+    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
+  );
+$offtext
+  if(jkVoltMagDevLo(j,k) > voltageMagnitudeDeviationTolerance,
+    lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMax(l);
+    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
+  elseif jkVoltMagDevUp(j,k) > voltageMagnitudeDeviationTolerance,
+    lkReactivePower.fx(l,k)$(lkActive(l,k) and ljMap(l,j)) = lReactivePowerMin(l);
+    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
+  else
+    jkVoltageMagnitudeViolationPos.fx(j,k) = 0;
+    jkVoltageMagnitudeViolationNeg.fx(j,k) = 0;
+  );
+);
+
+* resolve with fixed complementarity and no penalties
+*$ontext
+if(modelStatus = 2,
+penaltyCoeff = 0;
+*pscopf.holdfixed = 1;
+solve pscopf using nlp minimizing obj;
+modelStatus = pscopf.modelstat;
+solveStatus = pscopf.solvestat;
+);
+*$offtext
+
+* assess solution
+lkReactivePowerSlackLo(l,k)$lkActive(l,k)
+  = max(0,lkReactivePower.l(l,k)-lReactivePowerMin(l));
+lkReactivePowerSlackUp(l,k)$lkActive(l,k)
+  = max(0,lReactivePowerMax(l)-lkReactivePower.l(l,k));
+jkReactivePowerGenSlackLo(j,k)
+  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackLo(l,k));
+jkReactivePowerGenSlackUp(j,k)
+  = sum(l$(ljMap(l,j) and lkActive(l,k)),lkReactivePowerSlackUp(l,k));
+jkVoltMagDevLo(j,k)
+  =  max(0,sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1))-jkVoltageMagnitude.l(j,k))
+    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
+jkVoltMagDevUp(j,k)
+  = max(0,jkVoltageMagnitude.l(j,k)-sum(k1$kBase(k1),jkVoltageMagnitude.l(j,k1)))
+    $(sum(l$(lkActive(l,k) and ljMap(l,j)),1) > 0);
+jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
+  = jkVoltMagDevLo(j,k)*jkReactivePowerGenSlackUp(j,k);
+jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k)
+  = jkVoltMagDevUp(j,k)*jkReactivePowerGenSlackLo(j,k);
 
 * translate back to data units
 lkReactivePowerSlackLo(l,k)$lkActive(l,k)

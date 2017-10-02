@@ -578,8 +578,6 @@ jkVoltageMagnitudeMaintenanceViolationDef.scale(j,k)$(not kBase(k) and sum(l$(lk
 
 * solver options
 
-option nlp=examiner;
-
 $onecho > knitro.opt
 feastol 1e-8
 *feastol_abs 1e-2
@@ -688,7 +686,7 @@ modelStatus = pscopf.modelstat;
 solveStatus = pscopf.solvestat;
 $offtext
 
-*$ontext
+$ontext
 $onecho > examiner.op2
 examineGamsPoint 1
 examineInitPoint 0
@@ -698,7 +696,7 @@ $offecho
 option nlp = examiner;
 pscopf.optfile = 2;
 solve pscopf using nlp minimizing obj;
-*$offtext
+$offtext
 
 * compute solution from variable values
 $include pscopf_compute_solution.gms

@@ -18,29 +18,6 @@ Compute solution from variable values
 
 $offtext
 
-
-
-
-
-
-
-
-
-$ontext
-* solution
-parameter
-  modelStatus /0/
-  solveStatus /0/
-  lkReactivePowerSlackLo(l,k)
-  lkReactivePowerSlackUp(l,k)
-  jkReactivePowerGenSlackLo(j,k)
-  jkReactivePowerGenSlackUp(j,k)
-  jkVoltMagDevLo(j,k)
-  jkVoltMagDevUp(j,k)
-  jkVoltMagDevLoReactivePowerGenSlackUpCompViol(j,k)
-  jkVoltMagDevUpReactivePowerGenSlackLoCompViol(j,k);
-$offtext
-
 * computed solution variable values
 parameter
   lkRealPowerSol(l,k)
@@ -54,8 +31,6 @@ parameter
   ikRealPowerDestinationSol(i,k) bus to branch
   ikReactivePowerDestinationSol(i,k) bus to branch
   kRealPowerShortfallSol(k) missing real power that must be made up by increased generation;
-*  jkVoltageMagnitudeViolationPosSol(j,k)
-*  jkVoltageMagnitudeViolationNegSol(j,k);
 
 * computed solution variable bound violations
 parameter
@@ -65,6 +40,15 @@ parameter
   lkRealPowerUpViolSol(l,k)
   lkReactivePowerLoViolSol(l,k)
   lkReactivePowerUpViolSol(l,k);
+
+* normalized solution variable bound violations
+parameter
+  jkVoltageMagnitudeLoViolNorm(j,k)
+  jkVoltageMagnitudeUpViolNorm(j,k)
+  lkRealPowerLoViolNorm(l,k)
+  lkRealPowerUpViolNorm(l,k)
+  lkReactivePowerLoViolNorm(l,k)
+  lkReactivePowerUpViolNorm(l,k);
 
 * computed solution slacks
 parameter
@@ -86,8 +70,22 @@ parameter
   lk_QLoSlack_VMDevPos_compViolSol(l,k)
   lk_QUpSlack_VMDevNeg_compViolSol(l,k);
 
+* normalized solution constraint violations
+parameter
+  jkRealPowerBalanceViolNorm(j,k)
+  jkReactivePowerBalanceViolNorm(j,k)
+  ikPowerMagOrigBoundViolNorm(i,k)
+  ikPowerMagDestBoundViolNorm(i,k)
+  ijjkVoltMagImpZeroViolNorm(i,j1,j2,k)
+  ijjkVoltAngImpZeroViolNorm(i,j1,j2,k)
+  ikRealPowerImpZeroViolNorm(i,k)
+  ijjkReactivePowerImpZeroViolNorm(i,j1,j2,k)
+  lk_QLoSlack_VMDevPos_compViolNorm(l,k)
+  lk_QUpSlack_VMDevNeg_compViolNorm(l,k);
+
 * bound and constraint violation summary
 parameter
+  max_violSol
   max_jkVoltageMagnitudeLoViolSol
   max_jkVoltageMagnitudeUpViolSol
   max_lkRealPowerLoViolSol
@@ -104,6 +102,26 @@ parameter
   max_ijjkReactivePowerImpZeroViolSol
   max_lk_QLoSlack_VMDevPos_compViolSol
   max_lk_QUpSlack_VMDevNeg_compViolSol;
+
+* normalized bound and constraint violation summary
+parameter
+  max_ViolNorm
+  max_jkVoltageMagnitudeLoViolNorm
+  max_jkVoltageMagnitudeUpViolNorm
+  max_lkRealPowerLoViolNorm
+  max_lkRealPowerUpViolNorm
+  max_lkReactivePowerLoViolNorm
+  max_lkReactivePowerUpViolNorm
+  max_jkRealPowerBalanceViolNorm
+  max_jkReactivePowerBalanceViolNorm
+  max_ikPowerMagOrigBoundViolNorm
+  max_ikPowerMagDestBoundViolNorm
+  max_ijjkVoltMagImpZeroViolNorm
+  max_ijjkVoltAngImpZeroViolNorm
+  max_ikRealPowerImpZeroViolNorm
+  max_ijjkReactivePowerImpZeroViolNorm
+  max_lk_QLoSlack_VMDevPos_compViolNorm
+  max_lk_QUpSlack_VMDevNeg_compViolNorm;
 
 * initially set all solution values to variable levels
 lkRealPowerSol(l,k)$lkActive(l,k) = lkRealPower.l(l,k);
@@ -184,6 +202,26 @@ lkReactivePowerLoViolSol(l,k)$lkActive(l,k)
 lkReactivePowerUpViolSol(l,k)$lkActive(l,k)
   = max(0, lkReactivePowerSol(l,k) - lReactivePowerMax(l));
 
+* compute normalized variable bound violations
+jkVoltageMagnitudeLoViolNorm(j,k)
+  = jkVoltageMagnitudeLoViolSol(j,k)
+  / max(1, abs(jVoltageMagnitudeMin(j)));
+jkVoltageMagnitudeUpViolNorm(j,k)
+  = jkVoltageMagnitudeUpViolSol(j,k)
+  / max(1, abs(jVoltageMagnitudeMax(j)));
+lkRealPowerLoViolNorm(l,k)$lkActive(l,k)
+  = lkRealPowerLoViolSol(l,k)
+  / max(1, abs(lRealPowerMin(l)));
+lkRealPowerUpViolNorm(l,k)$lkActive(l,k)
+  = lkRealPowerUpViolSol(l,k)
+  / max(1, abs(lRealPowerMax(l)));
+lkReactivePowerLoViolNorm(l,k)$lkActive(l,k)
+  = lkReactivePowerLoViolSol(l,k)
+  / max(1, abs(lReactivePowerMin(l)));
+lkReactivePowerUpViolNorm(l,k)$lkActive(l,k)
+  = lkReactivePowerUpViolSol(l,k)
+  / max(1, abs(lReactivePowerMax(l)));
+
 * compute slacks and deviations as needed
 lkReactivePowerLoSlackSol(l,k)$(not kBase(k) and lkActive(l,k))
   = max(0, lkReactivePowerSol(l,k) - lReactivePowerMin(l));
@@ -242,6 +280,38 @@ lk_QUpSlack_VMDevNeg_compViolSol(l,k)$(
   = min(lkReactivePowerUpSlackSol(l,k),
         lkVoltMagDevNegSol(l,k));
 
+* compute normalized solution constraint violations
+jkRealPowerBalanceViolNorm(j,k)
+  = jkRealPowerBalanceViolSol(j,k)
+  / max(1, abs(jRealPowerDemand(j)));
+jkReactivePowerBalanceViolNorm(j,k)
+  = jkReactivePowerBalanceViolSol(j,k)
+  / max(1, abs(jReactivePowerDemand(j)));
+ikPowerMagOrigBoundViolNorm(i,k)$ikActive(i,k)
+  = ikPowerMagOrigBoundViolSol(i,k)$ikActive(i,k)
+  / max(1, abs(iPowerMagnitudeMax(i)));
+ikPowerMagDestBoundViolNorm(i,k)$ikActive(i,k)
+  = ikPowerMagDestBoundViolSol(i,k)$ikActive(i,k)
+  / max(1, abs(iPowerMagnitudeMax(i)));
+ijjkVoltMagImpZeroViolNorm(i,j1,j2,k)$(
+  iSeriesImpedanceZero(i) and ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2))
+  = ijjkVoltMagImpZeroViolSol(i,j1,j2,k);
+ijjkVoltAngImpZeroViolNorm(i,j1,j2,k)$(
+  iSeriesImpedanceZero(i) and ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2))
+  = ijjkVoltAngImpZeroViolSol(i,j1,j2,k);
+ikRealPowerImpZeroViolNorm(i,k)$(
+  iSeriesImpedanceZero(i) and ikActive(i,k))
+  = ikRealPowerImpZeroViolSol(i,k);
+ijjkReactivePowerImpZeroViolNorm(i,j1,j2,k)$(
+  iSeriesImpedanceZero(i) and ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2))
+  = ijjkReactivePowerImpZeroViolSol(i,j1,j2,k);
+lk_QLoSlack_VMDevPos_compViolNorm(l,k)$(
+  not kBase(k) and lkActive(l,k))
+  = lk_QLoSlack_VMDevPos_compViolSol(l,k);
+lk_QUpSlack_VMDevNeg_compViolNorm(l,k)$(
+  not kBase(k) and lkActive(l,k))
+  = lk_QUpSlack_VMDevNeg_compViolSol(l,k);
+
 * compute summary values
 max_jkVoltageMagnitudeLoViolSol = max(0, smax((j,k), jkVoltageMagnitudeLoViolSol(j,k)));
 max_jkVoltageMagnitudeUpViolSol = max(0, smax((j,k), jkVoltageMagnitudeUpViolSol(j,k)));
@@ -272,6 +342,73 @@ max_lk_QLoSlack_VMDevPos_compViolSol
   = max(0, smax((l,k)$(not kBase(k) and lkActive(l,k)), lk_QLoSlack_VMDevPos_compViolSol(l,k)));
 max_lk_QUpSlack_VMDevNeg_compViolSol
   = max(0, smax((l,k)$(not kBase(k) and lkActive(l,k)), lk_QUpSlack_VMDevNeg_compViolSol(l,k)));
+max_ViolSol = max(
+  max_jkVoltageMagnitudeLoViolSol,
+  max_jkVoltageMagnitudeUpViolSol,
+  max_lkRealPowerLoViolSol,
+  max_lkRealPowerUpViolSol,
+  max_lkReactivePowerLoViolSol,
+  max_lkReactivePowerUpViolSol,
+  max_jkRealPowerBalanceViolSol,
+  max_jkReactivePowerBalanceViolSol,
+  max_ikPowerMagOrigBoundViolSol,
+  max_ikPowerMagDestBoundViolSol,
+  max_ijjkVoltMagImpZeroViolSol,
+  max_ijjkVoltAngImpZeroViolSol,
+  max_ikRealPowerImpZeroViolSol,
+  max_ijjkReactivePowerImpZeroViolSol,
+  max_lk_QLoSlack_VMDevPos_compViolSol,
+  max_lk_QUpSlack_VMDevNeg_compViolSol
+);
+
+* compute normalized summary values
+max_jkVoltageMagnitudeLoViolNorm = max(0, smax((j,k), jkVoltageMagnitudeLoViolNorm(j,k)));
+max_jkVoltageMagnitudeUpViolNorm = max(0, smax((j,k), jkVoltageMagnitudeUpViolNorm(j,k)));
+max_lkRealPowerLoViolNorm = max(0, smax((l,k)$lkActive(l,k), lkRealPowerLoViolNorm(l,k)));
+max_lkRealPowerUpViolNorm = max(0, smax((l,k)$lkActive(l,k), lkRealPowerUpViolNorm(l,k)));
+max_lkReactivePowerLoViolNorm = max(0, smax((l,k)$lkActive(l,k), lkReactivePowerLoViolNorm(l,k)));
+max_lkReactivePowerUpViolNorm = max(0, smax((l,k)$lkActive(l,k), lkReactivePowerUpViolNorm(l,k)));
+max_jkRealPowerBalanceViolNorm = max(0, smax((j,k), jkRealPowerBalanceViolNorm(j,k)));
+max_jkReactivePowerBalanceViolNorm = max(0, smax((j,k), jkReactivePowerBalanceViolNorm(j,k)));
+max_ikPowerMagOrigBoundViolNorm = max(0, smax((i,k)$ikActive(i,k), ikPowerMagOrigBoundViolNorm(i,k)));
+max_ikPowerMagDestBoundViolNorm = max(0, smax((i,k)$ikActive(i,k), ikPowerMagDestBoundViolNorm(i,k)));
+max_ijjkVoltMagImpZeroViolNorm
+  = max(0, smax((i,j1,j2,k)$(
+                  iSeriesImpedanceZero(i) and ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2)),
+	        ijjkVoltMagImpZeroViolNorm(i,j1,j2,k)));
+max_ijjkVoltAngImpZeroViolNorm
+  = max(0, smax((i,j1,j2,k)$(
+                  iSeriesImpedanceZero(i) and ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2)),
+	        ijjkVoltAngImpZeroViolNorm(i,j1,j2,k)));
+max_ikRealPowerImpZeroViolNorm
+  = max(0, smax((i,k)$(iSeriesImpedanceZero(i) and ikActive(i,k)),
+                 ikRealPowerImpZeroViolNorm(i,k)));
+max_ijjkReactivePowerImpZeroViolNorm
+  = max(0, smax((i,j1,j2,k)$(
+                  iSeriesImpedanceZero(i) and ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2)),
+        	 ijjkReactivePowerImpZeroViolNorm(i,j1,j2,k)));
+max_lk_QLoSlack_VMDevPos_compViolNorm
+  = max(0, smax((l,k)$(not kBase(k) and lkActive(l,k)), lk_QLoSlack_VMDevPos_compViolNorm(l,k)));
+max_lk_QUpSlack_VMDevNeg_compViolNorm
+  = max(0, smax((l,k)$(not kBase(k) and lkActive(l,k)), lk_QUpSlack_VMDevNeg_compViolNorm(l,k)));
+max_ViolNorm = max(
+  max_jkVoltageMagnitudeLoViolNorm,
+  max_jkVoltageMagnitudeUpViolNorm,
+  max_lkRealPowerLoViolNorm,
+  max_lkRealPowerUpViolNorm,
+  max_lkReactivePowerLoViolNorm,
+  max_lkReactivePowerUpViolNorm,
+  max_jkRealPowerBalanceViolNorm,
+  max_jkReactivePowerBalanceViolNorm,
+  max_ikPowerMagOrigBoundViolNorm,
+  max_ikPowerMagDestBoundViolNorm,
+  max_ijjkVoltMagImpZeroViolNorm,
+  max_ijjkVoltAngImpZeroViolNorm,
+  max_ikRealPowerImpZeroViolNorm,
+  max_ijjkReactivePowerImpZeroViolNorm,
+  max_lk_QLoSlack_VMDevPos_compViolNorm,
+  max_lk_QUpSlack_VMDevNeg_compViolNorm
+);
 
 * convert solution variables
 * from units of the optimization model (p.u. generally)
@@ -297,7 +434,26 @@ kRealPowerShortfallSol(k)
 
 file sol3 /'solution3.txt'/;
 put sol3;
+sol3.nr = 2;
 put '--summary' /;
+put 'max norm viol all bnd/constr (1),' max_ViolNorm:0:10 /;
+put 'max norm viol bus volt mag min (1),' max_jkVoltageMagnitudeLoViolNorm:0:10 /;
+put 'max norm viol bus volt mag max (1),' max_jkVoltageMagnitudeUpViolNorm:0:10 /;
+put 'max norm viol gen real power min (1),' max_lkRealPowerLoViolNorm:0:10 /;
+put 'max norm viol gen real power max (1),' max_lkRealPowerUpViolNorm:0:10 /;
+put 'max norm viol gen reactive power min (1),' max_lkReactivePowerLoViolNorm:0:10 /;
+put 'max norm viol gen reactive power max (1),' max_lkReactivePowerUpViolNorm:0:10 /;
+put 'max norm viol bus real power balance (1),' max_jkRealPowerBalanceViolNorm:0:10 /;
+put 'max norm viol bus reactive power balance (1),' max_jkReactivePowerBalanceViolNorm:0:10 /;
+put 'max norm viol branch power mag orig bound (1),' max_ikPowerMagOrigBoundViolNorm:0:10 /;
+put 'max norm viol branch power mag dest bound (1),' max_ikPowerMagDestBoundViolNorm:0:10 /;
+put 'max norm viol zero imped branch volt mag equ (1),' max_ijjkVoltMagImpZeroViolNorm:0:10 /;
+put 'max norm viol zero imped branch volt ang equ (1),' max_ijjkVoltAngImpZeroViolNorm:0:10 /;
+put 'max norm viol zero imped branch real power equ (1),' max_ikRealPowerImpZeroViolNorm:0:10 /;
+put 'max norm viol zero imped branch reactive power equ (1),' max_ijjkReactivePowerImpZeroViolNorm:0:10 /;
+put 'max norm viol gen reactive power lower slack . over voltage (1),' max_lk_QLoSlack_VMDevPos_compViolNorm:0:10 /;
+put 'max norm viol gen reactive power upper slack . under voltage (1),' max_lk_QUpSlack_VMDevNeg_compViolNorm:0:10 /;
+put 'max viol all bnd/constr (pu),' max_ViolSol:0:10 /;
 put 'max viol bus volt mag min (pu),' max_jkVoltageMagnitudeLoViolSol:0:10 /;
 put 'max viol bus volt mag max (pu),' max_jkVoltageMagnitudeUpViolSol:0:10 /;
 put 'max viol gen real power min (pu),' max_lkRealPowerLoViolSol:0:10 /;
@@ -315,6 +471,7 @@ put 'max viol zero imped branch reactive power equ (pu),' max_ijjkReactivePowerI
 put 'max viol gen reactive power lower slack . over voltage (pu),' max_lk_QLoSlack_VMDevPos_compViolSol:0:10 /;
 put 'max viol gen reactive power upper slack . under voltage (pu),' max_lk_QUpSlack_VMDevNeg_compViolSol:0:10 /;
 put '--end of summary' /;
+sol3.nr = 1;
 put '--base generator' /;
 put
   'genID,'
@@ -325,7 +482,11 @@ put
   'pViolLo(pu),'
   'pViolUp(pu),'
   'qViolLo(pu),'
-  'qViolUp(pu)' /;
+  'qViolUp(pu),'
+  'pViolNormLo(1),'
+  'pViolNormUp(1),'
+  'qViolNormLo(1),'
+  'qViolNormUp(1)' /;
 loop(kBase(k),
   loop((l,j,u)$(lkActive(l,k) and ljMap(l,j) and luMap(l,u)),
     put
@@ -337,7 +498,11 @@ loop(kBase(k),
       lkRealPowerLoViolSol(l,k):0:10 ','
       lkRealPowerUpViolSol(l,k):0:10 ','
       lkReactivePowerLoViolSol(l,k):0:10 ','
-      lkReactivePowerUpViolSol(l,k):0:10 /;
+      lkReactivePowerUpViolSol(l,k):0:10 ','
+      lkRealPowerLoViolNorm(l,k):0:10 ','
+      lkRealPowerUpViolNorm(l,k):0:10 ','
+      lkReactivePowerLoViolNorm(l,k):0:10 ','
+      lkReactivePowerUpViolNorm(l,k):0:10 /;
   );
 );
 put '--end of base generator' /;
@@ -351,7 +516,11 @@ put
   'pBalViol(pu),'
   'qBalViol(pu),'
   'vMagViolLo(pu),'
-  'vMagViolUp(pu)' /;
+  'vMagViolUp(pu),'
+  'pBalViolNorm(1),'
+  'qBalViolNorm(1),'
+  'vMagViolNormLo(1),'
+  'vMagViolNormUp(1)' /;
 loop(kBase(k),
   loop(j,
     put
@@ -363,7 +532,11 @@ loop(kBase(k),
       jkRealPowerBalanceViolSol(j,k):0:10 ','
       jkReactivePowerBalanceViolSol(j,k):0:10 ','
       jkVoltageMagnitudeLoViolSol(j,k):0:10 ','
-      jkVoltageMagnitudeUpViolSol(j,k):0:10 /;
+      jkVoltageMagnitudeUpViolSol(j,k):0:10 ','
+      jkRealPowerBalanceViolNorm(j,k):0:10 ','
+      jkReactivePowerBalanceViolNorm(j,k):0:10 ','
+      jkVoltageMagnitudeLoViolNorm(j,k):0:10 ','
+      jkVoltageMagnitudeUpViolNorm(j,k):0:10 /;
   );
 );
 put '--end of base bus' /;
@@ -382,7 +555,13 @@ put
   'zVMagViol(pu),'
   'zVAngViol(rad),'
   'zPViol(pu),'
-  'zQViol(pu)' /;
+  'zQViol(pu),'
+  'sOrigViolNorm(1),'
+  'sDestViolNorm(1),'
+  'zVMagViolNorm(1),'
+  'zVAngViolNorm(1),'
+  'zPViolNorm(1),'
+  'zQViolNorm(1)' /;
 loop(kBase(k),
   loop((i,j1,j2,c)$(ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2) and icMap(i,c)),
     put
@@ -399,7 +578,13 @@ loop(kBase(k),
       ijjkVoltMagImpZeroViolSol(i,j1,j2,k):0:10 ','
       ijjkVoltAngImpZeroViolSol(i,j1,j2,k):0:10 ','
       ikRealPowerImpZeroViolSol(i,k):0:10 ','
-      ijjkReactivePowerImpZeroViolSol(i,j1,j2,k):0:10 /;
+      ijjkReactivePowerImpZeroViolSol(i,j1,j2,k):0:10 ','
+      ikPowerMagOrigBoundViolNorm(i,k):0:10 ','
+      ikPowerMagDestBoundViolNorm(i,k):0:10 ','
+      ijjkVoltMagImpZeroViolNorm(i,j1,j2,k):0:10 ','
+      ijjkVoltAngImpZeroViolNorm(i,j1,j2,k):0:10 ','
+      ikRealPowerImpZeroViolNorm(i,k):0:10 ','
+      ijjkReactivePowerImpZeroViolNorm(i,j1,j2,k):0:10 /;
   );
 );
 put '--end of base branch' /;
@@ -427,7 +612,13 @@ put
   'qViolLo(pu),'
   'qViolUp(pu),'
   'qLoSlackVMagDevPosCompViol(pu),'
-  'qUpSlackVMagDevNegCompViol(pu)' /;
+  'qUpSlackVMagDevNegCompViol(pu),'
+  'pViolNormLo(1),'
+  'pViolNormUp(1),'
+  'qViolNormLo(1),'
+  'qViolNormUp(1),'
+  'qLoSlackVMagDevPosCompViolNorm(1),'
+  'qUpSlackVMagDevNegCompViolNorm(1)' /;
 loop(k$(not kBase(k)),
   loop((l,j,u)$(lkActive(l,k) and ljMap(l,j) and luMap(l,u)),
     put
@@ -442,7 +633,13 @@ loop(k$(not kBase(k)),
       lkReactivePowerLoViolSol(l,k):0:10 ','
       lkReactivePowerUpViolSol(l,k):0:10 ','
       lk_QLoSlack_VMDevPos_compViolSol(l,k):0:10 ','
-      lk_QUpSlack_VMDevNeg_compViolSol(l,k):0:10 /;
+      lk_QUpSlack_VMDevNeg_compViolSol(l,k):0:10 ','
+      lkRealPowerLoViolNorm(l,k):0:10 ','
+      lkRealPowerUpViolNorm(l,k):0:10 ','
+      lkReactivePowerLoViolNorm(l,k):0:10 ','
+      lkReactivePowerUpViolNorm(l,k):0:10 ','
+      lk_QLoSlack_VMDevPos_compViolNorm(l,k):0:10 ','
+      lk_QUpSlack_VMDevNeg_compViolNorm(l,k):0:10 /;
   );
 );
 put '--end of contingency generator' /;
@@ -457,7 +654,11 @@ put
   'pBalViol(pu),'
   'qBalViol(pu),'
   'vMagViolLo(pu),'
-  'vMagViolUp(pu)' /;
+  'vMagViolUp(pu),'
+  'pBalViolNorm(1),'
+  'qBalViolNorm(1),'
+  'vMagViolNormLo(1),'
+  'vMagViolNormUp(1)' /;
 loop(k$(not kBase(k)),
   loop(j,
     put
@@ -470,7 +671,11 @@ loop(k$(not kBase(k)),
       jkRealPowerBalanceViolSol(j,k):0:10 ','
       jkReactivePowerBalanceViolSol(j,k):0:10 ','
       jkVoltageMagnitudeLoViolSol(j,k):0:10 ','
-      jkVoltageMagnitudeUpViolSol(j,k):0:10 /;
+      jkVoltageMagnitudeUpViolSol(j,k):0:10 ','
+      jkRealPowerBalanceViolNorm(j,k):0:10 ','
+      jkReactivePowerBalanceViolNorm(j,k):0:10 ','
+      jkVoltageMagnitudeLoViolNorm(j,k):0:10 ','
+      jkVoltageMagnitudeUpViolNorm(j,k):0:10 /;
   );
 );
 put '--end of contingency bus' /;
@@ -490,7 +695,13 @@ put
   'zVMagViol(pu),'
   'zVAngViol(rad),'
   'zPViol(pu),'
-  'zQViol(pu)' /;
+  'zQViol(pu),'
+  'sOrigViolNorm(1),'
+  'sDestViolNorm(1),'
+  'zVMagViolNorm(1),'
+  'zVAngViolNorm(1),'
+  'zPViolNorm(1),'
+  'zQViolNorm(1)' /;
 loop(k$(not kBase(k)),
   loop((i,j1,j2,c)$(ikActive(i,k) and ijOrigin(i,j1) and ijDestination(i,j2) and icMap(i,c)),
     put
@@ -508,11 +719,39 @@ loop(k$(not kBase(k)),
       ijjkVoltMagImpZeroViolSol(i,j1,j2,k):0:10 ','
       ijjkVoltAngImpZeroViolSol(i,j1,j2,k):0:10 ','
       ikRealPowerImpZeroViolSol(i,k):0:10 ','
-      ijjkReactivePowerImpZeroViolSol(i,j1,j2,k):0:10 /;
+      ijjkReactivePowerImpZeroViolSol(i,j1,j2,k):0:10 ','
+      ikPowerMagOrigBoundViolNorm(i,k):0:10 ','
+      ikPowerMagDestBoundViolNorm(i,k):0:10 ','
+      ijjkVoltMagImpZeroViolNorm(i,j1,j2,k):0:10 ','
+      ijjkVoltAngImpZeroViolNorm(i,j1,j2,k):0:10 ','
+      ikRealPowerImpZeroViolNorm(i,k):0:10 ','
+      ijjkReactivePowerImpZeroViolNorm(i,j1,j2,k):0:10 /;
   );
 );
 put '--end of contingency branch' /;
-
-
+*$ontext
+* debugging output
+put '--contingency bus debug' /;
+put
+  'conID,'
+  'busID,'
+  'qLoad(pu),'
+  'qBalViol(pu),'
+  'qBalViolNorm(1)' /
+loop(k,
+  loop(j,
+    if(jkReactivePowerBalanceViolSol(j,k) > 0,
+      put
+        k.tl:0 ','
+        j.tl:0 ','
+        jReactivePowerDemand(j):0:10 ','
+        jkReactivePowerBalanceViolSol(j,k):0:10 ','
+        jkReactivePowerBalanceViolNorm(j,k):0:10 /;
+    );
+  );
+);
+put '--end of contingency bus' /;
+* end debugging output
+*$offtext
 putclose;
   
